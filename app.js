@@ -28,56 +28,8 @@ const FIXED_SELLER = {
 };
 
 // =============================================================================
-// 2. Default Invoice State (Exact Data from Original Bill Photo)
+// 2. Default Invoice State & Signature Presets
 // =============================================================================
-const ORIGINAL_BILL_DATA = {
-  invoiceNumber: '001',
-  invoiceDate: '2022-05-15',
-  copyType: 'ORIGINAL',
-  category: 'JOB WORK',
-
-  // Buyer Details ("Billed To:")
-  buyer: {
-    name: 'M/s SREE CORPORATION',
-    addr1: 'C-72, PHASE-I',
-    addr2: 'TALANAGRI',
-    cityPin: 'ALIGARH - 202001',
-    gstin: '09AEZPG1543H1Z6',
-    state: 'UTTAR PRADESH',
-    stateCode: '09'
-  },
-
-  // Details of Consignment
-  consignment: {
-    transport: '',
-    lrNo: '',
-    vehNo: '',
-    ewbNo: '',
-    placeOfSupply: '',
-    noOfCases: '35 BAGS',
-    reverseCharge: '',
-    weight: 402.000,
-    freight: 0
-  },
-
-  // Line items (Particulars)
-  items: [
-    {
-      id: 'item-1',
-      particulars: 'ZINC DIE CASTING CHARGES',
-      hsn: '9988',
-      qty: 402.000,
-      rate: 40.00
-    }
-  ],
-
-  // Tax and Round off
-  taxMode: 'intra', // 'intra' (9% SGST + 9% CGST) or 'inter' (18% IGST)
-  autoDetectTax: true,
-  autoRoundoff: true,
-  customRoundoff: -0.40,
-  wordsOverride: '',
-
 // Official S K Enterprises Partner Signature Preset Vector Data URL
 const DEFAULT_PARTNER_SIGNATURE_DATAURL = (function() {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="110" viewBox="0 0 320 110">
