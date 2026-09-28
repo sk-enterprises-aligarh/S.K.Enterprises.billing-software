@@ -1,1379 +1,1433 @@
 /**
- * ApexBill Pro - Advanced Billing & GST Invoicing Software
- * Comprehensive state management, live reactive calculations,
- * Indian & International Number-to-Words converter,
- * Canvas Signature Pad, Digital Rubber Stamp, and UPI QR Code Generator.
+ * S K ENTERPRISES - Smart GST Tax Invoice & Job Work Billing System
+ * 
+ * Rules:
+ * - Seller / Bill Owner is STRICTLY LOCKED to S K ENTERPRISES (Aligarh)
+ * - Only Buyer Details ("Billed To"), Consignment, Items & Material Ledger can be edited
+ * - Includes Indian currency Number-to-Words, Zinc Job Work Ledger calculations,
+ *   Buyer Directory, Local Storage History, and Pixel-Perfect A4 Printing.
  */
 
 // =============================================================================
-// 1. Initial State & Data Model
+// 1. Permanent / Fixed Seller & Owner Configuration
 // =============================================================================
-const DEFAULT_INVOICE = {
-  invoiceNumber: 'INV-2026-0842',
-  invoiceType: 'TAX INVOICE',
-  invoiceDate: new Date().toISOString().split('T')[0],
-  dueDate: new Date(Date.now() + 15 * 86400000).toISOString().split('T')[0],
-  copyType: 'ORIGINAL FOR RECIPIENT',
-  placeOfSupply: 'Delhi (07)',
-  currencySymbol: '₹',
-  gstSupplyType: 'inter', // 'inter' (IGST) or 'intra' (CGST+SGST)
-  overallDiscount: 0,
-  shippingCharges: 0,
-  autoRoundoff: true,
+const FIXED_SELLER = {
+  name: 'S K ENTERPRISES',
+  address: 'AGRAWAL STREET, SHAKTI NAGAR, GULAR ROAD, ALIGARH 202001 (UP) - INDIA',
+  mobile: '93595 02004',
+  gstin: '09AVQPG8947B1Z6',
+  stateCode: '09',
+  state: 'UTTAR PRADESH',
+  bankName: 'CANARA BANK',
+  branch: 'SME BRANCH, GULAR ROAD, ALIGARH',
+  acNo: '120002136484',
+  ifsc: 'CNRB0002375',
+  signatory: 'FOR S K ENTERPRISES',
+  signCaption: 'Partner/ Authorised Signatory',
+  jurisdiction: 'All Disputes are Subject to Aligarh Jurisdiction'
+};
 
-  logo: {
-    src: 'logo-placeholder.svg',
-    height: 65,
-    alignment: 'center',
-    visible: true
-  },
+// =============================================================================
+// 2. Default Invoice State (Exact Data from Original Bill Photo)
+// =============================================================================
+const ORIGINAL_BILL_DATA = {
+  invoiceNumber: '001',
+  invoiceDate: '2022-05-15',
+  copyType: 'ORIGINAL',
+  category: 'JOB WORK',
 
-  supplier: {
-    name: 'Apex Enterprises Pvt Ltd',
-    gstin: '07AAAAA1234A1Z5',
-    pan: 'AAAAA1234A',
-    address: 'Plot 45, Okhla Industrial Area, Phase-III, New Delhi - 110020',
-    phone: '+91 98765 43210',
-    email: 'billing@apexcorp.com',
-    state: 'Delhi',
-    stateCode: '07'
-  },
-
+  // Buyer Details ("Billed To:")
   buyer: {
-    name: 'Nexus Infotech Solutions LLP',
-    gstin: '27BBBBB5678B1Z2',
-    phone: '+91 91234 56789',
-    email: 'accounts@nexusinfotech.io',
-    address: 'Suite 502, Cyber Tower B, Hinjewadi Phase 1, Pune, Maharashtra - 411057',
-    state: 'Maharashtra',
-    stateCode: '27',
-    sameShipping: true,
-    shippingAddress: 'Suite 502, Cyber Tower B, Hinjewadi Phase 1, Pune, Maharashtra - 411057'
+    name: 'M/s SREE CORPORATION',
+    addr1: 'C-72, PHASE-I',
+    addr2: 'TALANAGRI',
+    cityPin: 'ALIGARH - 202001',
+    gstin: '09AEZPG1543H1Z6',
+    state: 'UTTAR PRADESH',
+    stateCode: '09'
   },
 
+  // Details of Consignment
+  consignment: {
+    transport: '',
+    lrNo: '',
+    vehNo: '',
+    ewbNo: '',
+    placeOfSupply: '',
+    noOfCases: '35 BAGS',
+    reverseCharge: '',
+    weight: 402.000,
+    freight: 0
+  },
+
+  // Line items (Particulars)
   items: [
     {
       id: 'item-1',
-      description: 'Enterprise Cloud Server Gateway 10G',
-      hsn: '851762',
-      qty: 2,
-      unit: 'Units',
-      rate: 45000,
-      discount: 5,
-      taxRate: 18
-    },
-    {
-      id: 'item-2',
-      description: 'Annual Software License & Maintenance (AMC)',
-      hsn: '998313',
-      qty: 1,
-      unit: 'Nos',
-      rate: 18500,
-      discount: 0,
-      taxRate: 18
-    },
-    {
-      id: 'item-3',
-      description: 'CAT-6 Shielded Network Patch Cables (Box of 20)',
-      hsn: '854449',
-      qty: 4,
-      unit: 'Box',
-      rate: 1800,
-      discount: 10,
-      taxRate: 18
+      particulars: 'ZINC DIE CASTING CHARGES',
+      hsn: '9988',
+      qty: 402.000,
+      rate: 40.00
     }
   ],
 
-  bank: {
-    name: 'HDFC Bank Ltd',
-    acNumber: '50200089123456',
-    ifsc: 'HDFC0001234',
-    branch: 'Okhla Phase III, New Delhi',
-    upi: 'apexenterprises@hdfcbank',
-    showQr: 'yes'
+  // Tax and Round off
+  taxMode: 'intra', // 'intra' (9% SGST + 9% CGST) or 'inter' (18% IGST)
+  autoDetectTax: true,
+  autoRoundoff: true,
+  customRoundoff: -0.40,
+  wordsOverride: '',
+
+  // Details of Material (Zinc Job Work Ledger)
+  material: {
+    show: true,
+    date: '2022-07-02',
+    opening: 0.000,
+    received: 1256.000,
+    delivered: 402.000,
+    loss: 20.100,
+    returned: 0.000
   },
 
-  terms: `1. Payment terms: 100% within 15 days from the date of invoice.
-2. Interest @ 18% p.a. will be charged for delayed payments.
-3. Goods once sold will not be taken back or exchanged.
-4. Subject to Delhi jurisdiction only.`,
-  notes: 'Thank you for your valued business!',
-
+  // Sign & Stamp
   stamp: {
-    visible: true,
-    company: 'APEX ENTERPRISES PVT LTD',
-    color: '#dc2626',
-    rotation: -8,
-    customSrc: null
+    show: true,
+    color: '#1d4ed8',
+    rotation: -7
   },
-
   signature: {
-    visible: true,
-    dataUrl: null,
-    signatoryName: 'Rajesh Sharma',
-    signatoryDesignation: 'Authorized Signatory & Partner'
+    show: false,
+    dataUrl: '',
+    caption: 'Partner/ Authorised Signatory'
   }
 };
 
-let invoiceState = JSON.parse(JSON.stringify(DEFAULT_INVOICE));
+// Active state clone
+let currentInvoice = JSON.parse(JSON.stringify(ORIGINAL_BILL_DATA));
+
+// Default Buyer Presets
+const DEFAULT_BUYERS = [
+  {
+    id: 'buyer-sree',
+    name: 'M/s SREE CORPORATION',
+    addr1: 'C-72, PHASE-I',
+    addr2: 'TALANAGRI',
+    cityPin: 'ALIGARH - 202001',
+    gstin: '09AEZPG1543H1Z6',
+    state: 'UTTAR PRADESH',
+    stateCode: '09'
+  },
+  {
+    id: 'buyer-aligarh-locks',
+    name: 'M/s ALIGARH LOCKS & DIE CASTINGS',
+    addr1: 'PLOT 14, ITI ROAD',
+    addr2: 'INDUSTRIAL AREA',
+    cityPin: 'ALIGARH - 202001',
+    gstin: '09BCDPG2314K1Z1',
+    state: 'UTTAR PRADESH',
+    stateCode: '09'
+  },
+  {
+    id: 'buyer-radhey',
+    name: 'M/s RADHEY KRISHNA HARDWARE',
+    addr1: 'D-19, SECTOR 2',
+    addr2: 'TALANAGRI INDUSTRIAL AREA',
+    cityPin: 'ALIGARH - 202001',
+    gstin: '09AAAFR1234A1Z3',
+    state: 'UTTAR PRADESH',
+    stateCode: '09'
+  }
+];
 
 // =============================================================================
-// 2. Number to Words Conversion (Indian and Western numbering formats)
+// 3. Indian Currency Number to Words Converter
 // =============================================================================
-function numberToWordsINR(amount) {
-  if (isNaN(amount) || amount === null || amount === undefined) return 'Zero Rupees Only';
-  const num = Math.abs(Number(amount));
-  if (num === 0) return 'Zero Rupees Only';
+function numberToIndianWords(amount) {
+  if (isNaN(amount) || amount === 0) return 'RUPEES ZERO ONLY';
+
+  const isNegative = amount < 0;
+  const absAmount = Math.abs(amount);
+  const rupees = Math.floor(absAmount);
+  const paise = Math.round((absAmount - rupees) * 100);
 
   const ones = [
-    '', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
-    'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen',
-    'Seventeen', 'Eighteen', 'Nineteen'
+    '', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE',
+    'TEN', 'ELEVEN', 'TWELVE', 'THIRTEEN', 'FOURTEEN', 'FIFTEEN', 'SIXTEEN',
+    'SEVENTEEN', 'EIGHTEEN', 'NINETEEN'
   ];
+
   const tens = [
-    '', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'
+    '', '', 'TWENTY', 'THIRTY', 'FORTY', 'FIFTY', 'SIXTY', 'SEVENTY', 'EIGHTY', 'NINETY'
   ];
 
   function convertTwoDigits(n) {
     if (n < 20) return ones[n];
     const unit = n % 10;
-    return tens[Math.floor(n / 10)] + (unit ? ' ' + ones[unit] : '');
+    const ten = Math.floor(n / 10);
+    return tens[ten] + (unit > 0 ? ' ' + ones[unit] : '');
   }
 
   function convertThreeDigits(n) {
-    let str = '';
-    const h = Math.floor(n / 100);
-    const rem = n % 100;
-    if (h > 0) {
-      str += ones[h] + ' Hundred';
-      if (rem > 0) str += ' and ';
+    const hundred = Math.floor(n / 100);
+    const rest = n % 100;
+    let res = '';
+    if (hundred > 0) {
+      res += ones[hundred] + ' HUNDRED';
+      if (rest > 0) res += ' AND ';
     }
-    if (rem > 0) {
-      str += convertTwoDigits(rem);
+    if (rest > 0) {
+      res += convertTwoDigits(rest);
     }
-    return str;
+    return res;
   }
 
-  const integerPart = Math.floor(num);
-  const decimalPart = Math.round((num - integerPart) * 100);
+  // Indian Numbering System: Crores, Lakhs, Thousands, Hundreds
+  let remaining = rupees;
+  const crore = Math.floor(remaining / 10000000);
+  remaining %= 10000000;
+  const lakh = Math.floor(remaining / 100000);
+  remaining %= 100000;
+  const thousand = Math.floor(remaining / 1000);
+  remaining %= 1000;
+  const hundredAndRest = remaining;
 
   let words = '';
 
-  if (integerPart === 0) {
-    words = 'Zero';
+  if (crore > 0) {
+    words += convertTwoDigits(crore) + ' CRORE ';
+  }
+  if (lakh > 0) {
+    words += convertTwoDigits(lakh) + ' LAKH ';
+  }
+  if (thousand > 0) {
+    words += convertTwoDigits(thousand) + ' THOUSAND ';
+  }
+  if (hundredAndRest > 0) {
+    words += convertThreeDigits(hundredAndRest);
+  }
+
+  words = words.trim();
+  if (words === '') words = 'ZERO';
+
+  let result = 'RUPEES ' + words;
+  if (paise > 0) {
+    result += ' AND PAISE ' + convertTwoDigits(paise);
   } else {
-    let n = integerPart;
-    // Crores (>= 1,00,00,000)
-    const crores = Math.floor(n / 10000000);
-    n %= 10000000;
-
-    // Lakhs (>= 1,00,000)
-    const lakhs = Math.floor(n / 100000);
-    n %= 100000;
-
-    // Thousands (>= 1,000)
-    const thousands = Math.floor(n / 1000);
-    n %= 1000;
-
-    // Hundreds & remaining
-    const remainder = n;
-
-    if (crores > 0) {
-      words += convertThreeDigits(crores) + ' Crore ';
-    }
-    if (lakhs > 0) {
-      words += convertTwoDigits(lakhs) + ' Lakh ';
-    }
-    if (thousands > 0) {
-      words += convertTwoDigits(thousands) + ' Thousand ';
-    }
-    if (remainder > 0) {
-      words += convertThreeDigits(remainder) + ' ';
-    }
+    result += ' AND PAISE ZERO ONLY';
   }
 
-  words = words.trim() + ' Rupees';
-
-  if (decimalPart > 0) {
-    words += ' and ' + convertTwoDigits(decimalPart) + ' Paise';
-  }
-
-  return words + ' Only';
+  if (isNegative) result = 'MINUS ' + result;
+  return result;
 }
 
-function numberToWordsUSD(amount, currency = 'Dollars', subUnit = 'Cents') {
-  if (isNaN(amount) || amount === 0) return `Zero ${currency} Only`;
-  const ones = [
-    '', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
-    'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen',
-    'Seventeen', 'Eighteen', 'Nineteen'
-  ];
-  const tens = [
-    '', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'
-  ];
-
-  function convertGroup(n) {
-    let out = '';
-    const h = Math.floor(n / 100);
-    const rem = n % 100;
-    if (h) out += ones[h] + ' Hundred ';
-    if (rem < 20) {
-      out += ones[rem] + ' ';
-    } else {
-      out += tens[Math.floor(rem / 10)] + ' ' + ones[rem % 10] + ' ';
-    }
-    return out.trim();
+// Format date to DD-MM-YYYY
+function formatDateDDMMYYYY(dateString) {
+  if (!dateString) return '';
+  const parts = dateString.split('-');
+  if (parts.length === 3) {
+    return `${parts[2]}-${parts[1]}-${parts[0]}`;
   }
-
-  const integerPart = Math.floor(amount);
-  const decimalPart = Math.round((amount - integerPart) * 100);
-
-  const scales = ['', 'Thousand', 'Million', 'Billion'];
-  let current = integerPart;
-  let scaleIndex = 0;
-  let parts = [];
-
-  while (current > 0 && scaleIndex < scales.length) {
-    const chunk = current % 1000;
-    if (chunk > 0) {
-      const chunkWords = convertGroup(chunk);
-      const scaleName = scales[scaleIndex];
-      parts.unshift(chunkWords + (scaleName ? ' ' + scaleName : ''));
-    }
-    current = Math.floor(current / 1000);
-    scaleIndex++;
-  }
-
-  let words = (parts.join(' ').trim() || 'Zero') + ' ' + currency;
-  if (decimalPart > 0) {
-    words += ' and ' + convertGroup(decimalPart) + ' ' + subUnit;
-  }
-  return words + ' Only';
+  return dateString;
 }
 
-function getFormattedAmountInWords(amount, symbol) {
-  if (symbol === '₹') {
-    return numberToWordsINR(amount);
-  } else if (symbol === '$') {
-    return numberToWordsUSD(amount, 'US Dollars', 'Cents');
-  } else if (symbol === '€') {
-    return numberToWordsUSD(amount, 'Euros', 'Cents');
-  } else if (symbol === '£') {
-    return numberToWordsUSD(amount, 'Pounds', 'Pence');
-  } else {
-    return numberToWordsINR(amount).replace('Rupees', symbol.trim()).replace('Paise', 'Cents');
-  }
-}
-
-// Format Currency
-function formatCurrency(val, symbol = '₹') {
-  const num = Number(val) || 0;
-  return `${symbol} ${num.toLocaleString('en-IN', {
+// Format currency amount with commas and 2 decimals
+function formatCurrency(num) {
+  return Number(num || 0).toLocaleString('en-IN', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
-  })}`;
-}
-
-// =============================================================================
-// 3. Signature Pad Implementation (Canvas HTML5)
-// =============================================================================
-class SignaturePadController {
-  constructor(canvasId, hintId) {
-    this.canvas = document.getElementById(canvasId);
-    this.hint = document.getElementById(hintId);
-    if (!this.canvas) return;
-    this.ctx = this.canvas.getContext('2d');
-    this.isDrawing = false;
-    this.hasSignature = false;
-    this.penColor = '#1e293b';
-    this.lineWidth = 2.2;
-
-    this.initEvents();
-  }
-
-  initEvents() {
-    const getPos = (e) => {
-      const rect = this.canvas.getBoundingClientRect();
-      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-      return {
-        x: (clientX - rect.left) * (this.canvas.width / rect.width),
-        y: (clientY - rect.top) * (this.canvas.height / rect.height)
-      };
-    };
-
-    const startDraw = (e) => {
-      e.preventDefault();
-      this.isDrawing = true;
-      const pos = getPos(e);
-      this.ctx.beginPath();
-      this.ctx.moveTo(pos.x, pos.y);
-      if (this.hint) this.hint.style.display = 'none';
-    };
-
-    const draw = (e) => {
-      if (!this.isDrawing) return;
-      e.preventDefault();
-      const pos = getPos(e);
-      this.ctx.lineWidth = this.lineWidth;
-      this.ctx.lineCap = 'round';
-      this.ctx.lineJoin = 'round';
-      this.ctx.strokeStyle = this.penColor;
-      this.ctx.lineTo(pos.x, pos.y);
-      this.ctx.stroke();
-      this.hasSignature = true;
-    };
-
-    const stopDraw = () => {
-      if (!this.isDrawing) return;
-      this.isDrawing = false;
-      this.syncSignature();
-    };
-
-    // Mouse events
-    this.canvas.addEventListener('mousedown', startDraw);
-    window.addEventListener('mousemove', draw);
-    window.addEventListener('mouseup', stopDraw);
-
-    // Touch events for mobile/tablet/stylus
-    this.canvas.addEventListener('touchstart', startDraw, { passive: false });
-    window.addEventListener('touchmove', draw, { passive: false });
-    window.addEventListener('touchend', stopDraw);
-  }
-
-  setColor(color) {
-    this.penColor = color;
-  }
-
-  clear() {
-    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    this.hasSignature = false;
-    if (this.hint) this.hint.style.display = 'block';
-    invoiceState.signature.dataUrl = null;
-    const sigImg = document.getElementById('view-sig-img');
-    if (sigImg) {
-      sigImg.src = '';
-      sigImg.style.display = 'none';
-    }
-  }
-
-  syncSignature() {
-    if (!this.hasSignature) return;
-    const dataUrl = this.canvas.toDataURL('image/png');
-    invoiceState.signature.dataUrl = dataUrl;
-    const sigImg = document.getElementById('view-sig-img');
-    if (sigImg) {
-      sigImg.src = dataUrl;
-      sigImg.style.display = 'block';
-    }
-  }
-
-  loadSampleSignature() {
-    // Render a realistic default cursive digital signature curve on canvas
-    this.clear();
-    const ctx = this.ctx;
-    ctx.strokeStyle = this.penColor;
-    ctx.lineWidth = 2.2;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-
-    ctx.beginPath();
-    ctx.moveTo(35, 75);
-    // 'R' loop
-    ctx.bezierCurveTo(35, 30, 60, 30, 60, 60);
-    ctx.bezierCurveTo(60, 90, 75, 90, 95, 55);
-    // 'a' and 'j'
-    ctx.bezierCurveTo(110, 45, 120, 85, 130, 95);
-    ctx.bezierCurveTo(135, 115, 125, 125, 115, 110);
-    // flourish
-    ctx.bezierCurveTo(140, 50, 160, 60, 190, 55);
-    ctx.bezierCurveTo(210, 50, 240, 70, 290, 60);
-    // underline swoosh
-    ctx.moveTo(40, 98);
-    ctx.bezierCurveTo(120, 90, 200, 105, 300, 85);
-    ctx.moveTo(270, 95);
-    ctx.lineTo(295, 95);
-    ctx.stroke();
-
-    this.hasSignature = true;
-    if (this.hint) this.hint.style.display = 'none';
-    this.syncSignature();
-  }
-}
-
-// =============================================================================
-// 4. QR Code Canvas Generator (Offline UPI Pay Generator)
-// =============================================================================
-function drawUPIQRCode(canvasId, upiId, payeeName, amount) {
-  const canvas = document.getElementById(canvasId);
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  const size = canvas.width;
-  ctx.clearRect(0, 0, size, size);
-
-  // Background
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, size, size);
-
-  // We draw a stylized valid matrix code pattern with official QR markers
-  // so it looks completely authentic and clean in the printed bill
-  ctx.fillStyle = '#0f172a';
-
-  const cellSize = 3;
-  const margin = 6;
-  const gridCount = Math.floor((size - margin * 2) / cellSize);
-
-  // Draw corner Finder Patterns (QR Markers)
-  function drawFinderPattern(x, y) {
-    ctx.fillStyle = '#0f172a';
-    ctx.fillRect(x, y, cellSize * 7, cellSize * 7);
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(x + cellSize, y + cellSize, cellSize * 5, cellSize * 5);
-    ctx.fillStyle = '#0f172a';
-    ctx.fillRect(x + cellSize * 2, y + cellSize * 2, cellSize * 3, cellSize * 3);
-  }
-
-  drawFinderPattern(margin, margin);
-  drawFinderPattern(size - margin - cellSize * 7, margin);
-  drawFinderPattern(margin, size - margin - cellSize * 7);
-
-  // Pseudo-random deterministic hashing based on UPI string & amount to draw realistic data modules
-  const hashSeed = `${upiId}:${amount}:${payeeName}`.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
-
-  for (let r = 0; r < gridCount; r++) {
-    for (let c = 0; c < gridCount; c++) {
-      // Skip finder corners
-      if (r < 8 && c < 8) continue;
-      if (r < 8 && c > gridCount - 9) continue;
-      if (r > gridCount - 9 && c < 8) continue;
-
-      // Deterministic fill pattern
-      const pseudoVal = (Math.sin(r * 12.9898 + c * 78.233 + hashSeed) * 43758.5453) % 1;
-      if (Math.abs(pseudoVal) > 0.48) {
-        ctx.fillRect(margin + c * cellSize, margin + r * cellSize, cellSize, cellSize);
-      }
-    }
-  }
-
-  // Draw small center badge (UPI logo icon indicator)
-  const centerSize = cellSize * 5;
-  const centerPos = (size - centerSize) / 2;
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(centerPos - 1, centerPos - 1, centerSize + 2, centerSize + 2);
-  ctx.fillStyle = '#2563eb';
-  ctx.fillRect(centerPos, centerPos, centerSize, centerSize);
-  ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 8px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('₹', size / 2, size / 2);
-}
-
-// =============================================================================
-// 5. Reactive UI & Invoice Sheet Synchronizer
-// =============================================================================
-let sigPadController = null;
-
-function initApp() {
-  sigPadController = new SignaturePadController('signature-pad', 'signature-hint');
-
-  // Setup tab switches
-  const tabButtons = document.querySelectorAll('.tab-btn');
-  tabButtons.forEach(btn => {
-    btn.addEventListener('click', () => {
-      tabButtons.forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-      btn.classList.add('active');
-      const targetId = btn.getAttribute('data-tab');
-      const targetContent = document.getElementById(targetId);
-      if (targetContent) targetContent.classList.add('active');
-    });
-  });
-
-  // Setup Pen colors
-  document.querySelectorAll('.pen-dot').forEach(dot => {
-    dot.addEventListener('click', () => {
-      document.querySelectorAll('.pen-dot').forEach(d => d.classList.remove('active'));
-      dot.classList.add('active');
-      const color = dot.getAttribute('data-color');
-      if (sigPadController) sigPadController.setColor(color);
-    });
-  });
-
-  // Clear signature button
-  const clearBtn = document.getElementById('btn-clear-sig');
-  if (clearBtn) {
-    clearBtn.addEventListener('click', () => {
-      if (sigPadController) sigPadController.clear();
-      showToast('Signature canvas cleared', 'info');
-    });
-  }
-
-  // Upload signature image
-  const inputSigFile = document.getElementById('input-sig-file');
-  if (inputSigFile) {
-    inputSigFile.addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          invoiceState.signature.dataUrl = event.target.result;
-          const sigImg = document.getElementById('view-sig-img');
-          if (sigImg) {
-            sigImg.src = event.target.result;
-            sigImg.style.display = 'block';
-          }
-          showToast('Custom signature uploaded', 'success');
-        };
-        reader.readAsDataURL(file);
-      }
-    });
-  }
-
-  // Upload custom stamp image
-  const inputCustomStamp = document.getElementById('input-custom-stamp');
-  if (inputCustomStamp) {
-    inputCustomStamp.addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          invoiceState.stamp.customSrc = event.target.result;
-          const stampImg = document.getElementById('view-stamp-img');
-          if (stampImg) stampImg.src = event.target.result;
-          showToast('Custom rubber stamp uploaded', 'success');
-        };
-        reader.readAsDataURL(file);
-      }
-    });
-  }
-
-  // Logo upload & space controls
-  const inputLogoFile = document.getElementById('input-logo-file');
-  if (inputLogoFile) {
-    inputLogoFile.addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          invoiceState.logo.src = event.target.result;
-          document.getElementById('logo-preview-img').src = event.target.result;
-          document.getElementById('view-company-logo').src = event.target.result;
-          document.getElementById('view-company-logo').style.display = 'block';
-          showToast('Company logo updated', 'success');
-        };
-        reader.readAsDataURL(file);
-      }
-    });
-  }
-
-  const btnResetLogo = document.getElementById('btn-reset-logo');
-  if (btnResetLogo) {
-    btnResetLogo.addEventListener('click', () => {
-      invoiceState.logo.src = 'logo-placeholder.svg';
-      document.getElementById('logo-preview-img').src = 'logo-placeholder.svg';
-      document.getElementById('view-company-logo').src = 'logo-placeholder.svg';
-      document.getElementById('view-company-logo').style.display = 'block';
-      showToast('Logo reset to default', 'info');
-    });
-  }
-
-  const btnRemoveLogo = document.getElementById('btn-remove-logo');
-  if (btnRemoveLogo) {
-    btnRemoveLogo.addEventListener('click', () => {
-      invoiceState.logo.src = '';
-      document.getElementById('logo-preview-img').src = '';
-      document.getElementById('view-company-logo').style.display = 'none';
-      showToast('Logo removed from invoice', 'info');
-    });
-  }
-
-  const logoHeightSlider = document.getElementById('logo-height-slider');
-  if (logoHeightSlider) {
-    logoHeightSlider.addEventListener('input', (e) => {
-      const h = e.target.value;
-      document.getElementById('logo-height-val').textContent = `${h}px`;
-      document.getElementById('view-company-logo').style.height = `${h}px`;
-      invoiceState.logo.height = h;
-    });
-  }
-
-  const logoAlignSelect = document.getElementById('logo-align-select');
-  if (logoAlignSelect) {
-    logoAlignSelect.addEventListener('change', (e) => {
-      const align = e.target.value;
-      const logoContainer = document.getElementById('top-middle-logo-container');
-      if (logoContainer) {
-        logoContainer.style.justifyContent = align === 'left' ? 'flex-start' : 'center';
-      }
-    });
-  }
-
-  // Setup Add Product Item buttons
-  document.getElementById('btn-add-item')?.addEventListener('click', addNewProductItem);
-  document.getElementById('btn-add-item-bottom')?.addEventListener('click', addNewProductItem);
-
-  // Setup Form Change Listeners
-  bindFormInputs();
-
-  // Print buttons
-  document.getElementById('btn-print')?.addEventListener('click', () => window.print());
-  document.getElementById('btn-quick-print')?.addEventListener('click', () => window.print());
-
-  // Demo / Sample Data button
-  document.getElementById('btn-sample-data')?.addEventListener('click', () => {
-    invoiceState = JSON.parse(JSON.stringify(DEFAULT_INVOICE));
-    syncStateToInputs();
-    if (sigPadController) sigPadController.loadSampleSignature();
-    calculateAndRender();
-    showToast('Demo invoice data loaded successfully!', 'success');
-  });
-
-  // New Invoice button
-  document.getElementById('btn-new-invoice')?.addEventListener('click', createNewBlankInvoice);
-
-  // Theme Toggle
-  document.getElementById('btn-theme-toggle')?.addEventListener('click', toggleTheme);
-
-  // Zoom controls for sheet
-  setupZoomControls();
-
-  // Saved Invoices Modal
-  setupSavedInvoicesManager();
-
-  // Load initial demo
-  syncStateToInputs();
-  if (sigPadController) sigPadController.loadSampleSignature();
-  calculateAndRender();
-  updateSavedInvoicesCount();
-}
-
-// Bind all form input change listeners
-function bindFormInputs() {
-  const fields = [
-    { id: 'inv-number', key: 'invoiceNumber' },
-    { id: 'inv-type', key: 'invoiceType' },
-    { id: 'inv-date', key: 'invoiceDate' },
-    { id: 'inv-due-date', key: 'dueDate' },
-    { id: 'inv-copy-type', key: 'copyType' },
-    { id: 'place-of-supply', key: 'placeOfSupply' },
-    { id: 'supplier-name', parent: 'supplier', key: 'name' },
-    { id: 'supplier-gstin', parent: 'supplier', key: 'gstin' },
-    { id: 'supplier-pan', parent: 'supplier', key: 'pan' },
-    { id: 'supplier-address', parent: 'supplier', key: 'address' },
-    { id: 'supplier-phone', parent: 'supplier', key: 'phone' },
-    { id: 'supplier-email', parent: 'supplier', key: 'email' },
-    { id: 'supplier-state', parent: 'supplier', key: 'state' },
-    { id: 'supplier-state-code', parent: 'supplier', key: 'stateCode' },
-    { id: 'buyer-name', parent: 'buyer', key: 'name' },
-    { id: 'buyer-gstin', parent: 'buyer', key: 'gstin' },
-    { id: 'buyer-phone', parent: 'buyer', key: 'phone' },
-    { id: 'buyer-email', parent: 'buyer', key: 'email' },
-    { id: 'buyer-address', parent: 'buyer', key: 'address' },
-    { id: 'buyer-state', parent: 'buyer', key: 'state' },
-    { id: 'buyer-state-code', parent: 'buyer', key: 'stateCode' },
-    { id: 'overall-discount', key: 'overallDiscount', isNum: true },
-    { id: 'shipping-charges', key: 'shippingCharges', isNum: true },
-    { id: 'currency-symbol', key: 'currencySymbol' },
-    { id: 'bank-name', parent: 'bank', key: 'name' },
-    { id: 'bank-ac-number', parent: 'bank', key: 'acNumber' },
-    { id: 'bank-ifsc', parent: 'bank', key: 'ifsc' },
-    { id: 'bank-branch', parent: 'bank', key: 'branch' },
-    { id: 'bank-upi', parent: 'bank', key: 'upi' },
-    { id: 'show-qr-code', parent: 'bank', key: 'showQr' },
-    { id: 'inv-terms', key: 'terms' },
-    { id: 'inv-notes', key: 'notes' },
-    { id: 'stamp-text-company', parent: 'stamp', key: 'company' },
-    { id: 'stamp-color', parent: 'stamp', key: 'color' },
-    { id: 'stamp-rotation', parent: 'stamp', key: 'rotation' },
-    { id: 'signatory-name', parent: 'signature', key: 'signatoryName' },
-    { id: 'signatory-designation', parent: 'signature', key: 'signatoryDesignation' }
-  ];
-
-  fields.forEach(f => {
-    const el = document.getElementById(f.id);
-    if (!el) return;
-    el.addEventListener('input', (e) => {
-      let val = f.isNum ? parseFloat(e.target.value) || 0 : e.target.value;
-      if (f.parent) {
-        invoiceState[f.parent][f.key] = val;
-      } else {
-        invoiceState[f.key] = val;
-      }
-      calculateAndRender();
-    });
-  });
-
-  // GST Supply Radio (Inter-State IGST vs Intra-State CGST+SGST)
-  document.querySelectorAll('input[name="gst-supply-type"]').forEach(radio => {
-    radio.addEventListener('change', (e) => {
-      invoiceState.gstSupplyType = e.target.value;
-      const note = document.getElementById('tax-explanation-note');
-      if (note) {
-        note.textContent = e.target.value === 'intra'
-          ? 'Intra-state supply: CGST & SGST (50% each) are applied within the state.'
-          : 'Inter-state supply: Single IGST tax is applied across states.';
-      }
-      calculateAndRender();
-    });
-  });
-
-  // Auto roundoff checkbox
-  document.getElementById('auto-roundoff')?.addEventListener('change', (e) => {
-    invoiceState.autoRoundoff = e.target.checked;
-    calculateAndRender();
-  });
-
-  // Same shipping checkbox
-  document.getElementById('same-shipping')?.addEventListener('change', (e) => {
-    invoiceState.buyer.sameShipping = e.target.checked;
-    const shippingBox = document.getElementById('shipping-details-container');
-    if (shippingBox) {
-      shippingBox.style.display = e.target.checked ? 'none' : 'block';
-    }
-    calculateAndRender();
-  });
-
-  document.getElementById('shipping-address')?.addEventListener('input', (e) => {
-    invoiceState.buyer.shippingAddress = e.target.value;
-    calculateAndRender();
-  });
-
-  // Toggle Stamp
-  document.getElementById('toggle-stamp')?.addEventListener('change', (e) => {
-    invoiceState.stamp.visible = e.target.checked;
-    const stampEl = document.getElementById('view-rubber-stamp');
-    if (stampEl) stampEl.style.display = e.target.checked ? 'flex' : 'none';
-  });
-
-  // Toggle Signature
-  document.getElementById('toggle-signature')?.addEventListener('change', (e) => {
-    invoiceState.signature.visible = e.target.checked;
-    const sigEl = document.getElementById('view-seller-signature');
-    if (sigEl) sigEl.style.display = e.target.checked ? 'flex' : 'none';
   });
 }
 
-// Sync current state into editor inputs
-function syncStateToInputs() {
-  document.getElementById('inv-number').value = invoiceState.invoiceNumber;
-  document.getElementById('inv-type').value = invoiceState.invoiceType;
-  document.getElementById('inv-date').value = invoiceState.invoiceDate;
-  document.getElementById('inv-due-date').value = invoiceState.dueDate;
-  document.getElementById('inv-copy-type').value = invoiceState.copyType;
-  document.getElementById('place-of-supply').value = invoiceState.placeOfSupply;
-
-  document.getElementById('supplier-name').value = invoiceState.supplier.name;
-  document.getElementById('supplier-gstin').value = invoiceState.supplier.gstin;
-  document.getElementById('supplier-pan').value = invoiceState.supplier.pan;
-  document.getElementById('supplier-address').value = invoiceState.supplier.address;
-  document.getElementById('supplier-phone').value = invoiceState.supplier.phone;
-  document.getElementById('supplier-email').value = invoiceState.supplier.email;
-  document.getElementById('supplier-state').value = invoiceState.supplier.state;
-  document.getElementById('supplier-state-code').value = invoiceState.supplier.stateCode;
-
-  document.getElementById('buyer-name').value = invoiceState.buyer.name;
-  document.getElementById('buyer-gstin').value = invoiceState.buyer.gstin;
-  document.getElementById('buyer-phone').value = invoiceState.buyer.phone;
-  document.getElementById('buyer-email').value = invoiceState.buyer.email;
-  document.getElementById('buyer-address').value = invoiceState.buyer.address;
-  document.getElementById('buyer-state').value = invoiceState.buyer.state;
-  document.getElementById('buyer-state-code').value = invoiceState.buyer.stateCode;
-
-  const sameShippingCheck = document.getElementById('same-shipping');
-  if (sameShippingCheck) {
-    sameShippingCheck.checked = invoiceState.buyer.sameShipping;
-    const shipContainer = document.getElementById('shipping-details-container');
-    if (shipContainer) {
-      shipContainer.style.display = invoiceState.buyer.sameShipping ? 'none' : 'block';
-    }
-  }
-  document.getElementById('shipping-address').value = invoiceState.buyer.shippingAddress || '';
-
-  // Taxes & Options
-  if (invoiceState.gstSupplyType === 'intra') {
-    document.getElementById('radio-intra').checked = true;
-  } else {
-    document.getElementById('radio-inter').checked = true;
-  }
-  document.getElementById('overall-discount').value = invoiceState.overallDiscount;
-  document.getElementById('shipping-charges').value = invoiceState.shippingCharges;
-  document.getElementById('auto-roundoff').checked = invoiceState.autoRoundoff;
-  document.getElementById('currency-symbol').value = invoiceState.currencySymbol;
-
-  // Bank
-  document.getElementById('bank-name').value = invoiceState.bank.name;
-  document.getElementById('bank-ac-number').value = invoiceState.bank.acNumber;
-  document.getElementById('bank-ifsc').value = invoiceState.bank.ifsc;
-  document.getElementById('bank-branch').value = invoiceState.bank.branch;
-  document.getElementById('bank-upi').value = invoiceState.bank.upi;
-  document.getElementById('show-qr-code').value = invoiceState.bank.showQr;
-
-  // Notes
-  document.getElementById('inv-terms').value = invoiceState.terms;
-  document.getElementById('inv-notes').value = invoiceState.notes;
-
-  // Stamp & Sign
-  document.getElementById('stamp-text-company').value = invoiceState.stamp.company;
-  document.getElementById('stamp-color').value = invoiceState.stamp.color;
-  document.getElementById('stamp-rotation').value = invoiceState.stamp.rotation;
-  document.getElementById('signatory-name').value = invoiceState.signature.signatoryName;
-  document.getElementById('signatory-designation').value = invoiceState.signature.signatoryDesignation;
-
-  renderProductEditorCards();
+// Format decimal quantity with 3 decimals
+function formatQty(num) {
+  return Number(num || 0).toFixed(3);
 }
 
 // =============================================================================
-// 6. Products Line Items Management & Calculation
+// 4. Calculations Engine
 // =============================================================================
-function renderProductEditorCards() {
-  const container = document.getElementById('items-form-list');
-  if (!container) return;
-  container.innerHTML = '';
-
-  const badgeCount = document.getElementById('items-badge-count');
-  if (badgeCount) badgeCount.textContent = invoiceState.items.length;
-
-  invoiceState.items.forEach((item, index) => {
-    const card = document.createElement('div');
-    card.className = 'item-editor-card';
-    card.dataset.id = item.id;
-
-    const itemSubtotal = item.qty * item.rate;
-    const itemDiscVal = itemSubtotal * (item.discount / 100);
-    const taxable = itemSubtotal - itemDiscVal;
-    const itemTax = taxable * (item.taxRate / 100);
-    const itemTotal = taxable + itemTax;
-
-    card.innerHTML = `
-      <div class="item-card-header">
-        <span class="item-card-index">Product #${index + 1}</span>
-        <div class="flex-align-gap">
-          <span class="item-card-total-badge">${formatCurrency(itemTotal, invoiceState.currencySymbol)}</span>
-          ${invoiceState.items.length > 1 ? `
-            <button type="button" class="btn-delete-item" title="Delete Product" data-delete-id="${item.id}">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-            </button>
-          ` : ''}
-        </div>
-      </div>
-
-      <div class="form-group mb-1">
-        <label>Description of Goods / Services *</label>
-        <input type="text" class="form-control item-desc" value="${escapeHTML(item.description)}" placeholder="e.g. Dell Latitude Laptop 16GB RAM" required>
-      </div>
-
-      <div class="form-row">
-        <div class="form-group flex-1">
-          <label>HSN / SAC</label>
-          <input type="text" class="form-control item-hsn uppercase" value="${escapeHTML(item.hsn)}" placeholder="e.g. 847130">
-        </div>
-        <div class="form-group flex-1">
-          <label>Qty *</label>
-          <input type="number" class="form-control item-qty" min="0.01" step="any" value="${item.qty}" required>
-        </div>
-        <div class="form-group flex-1">
-          <label>Unit</label>
-          <input type="text" class="form-control item-unit" value="${escapeHTML(item.unit)}" placeholder="Pcs, Kg, Box">
-        </div>
-      </div>
-
-      <div class="form-row">
-        <div class="form-group flex-1">
-          <label>Rate / Price (${invoiceState.currencySymbol}) *</label>
-          <input type="number" class="form-control item-rate" min="0" step="any" value="${item.rate}" required>
-        </div>
-        <div class="form-group flex-1">
-          <label>Disc %</label>
-          <input type="number" class="form-control item-discount" min="0" max="100" step="any" value="${item.discount}">
-        </div>
-        <div class="form-group flex-1">
-          <label>GST %</label>
-          <select class="form-control item-tax-rate">
-            <option value="0" ${item.taxRate === 0 ? 'selected' : ''}>0% (Nil)</option>
-            <option value="5" ${item.taxRate === 5 ? 'selected' : ''}>5%</option>
-            <option value="12" ${item.taxRate === 12 ? 'selected' : ''}>12%</option>
-            <option value="18" ${item.taxRate === 18 ? 'selected' : ''}>18%</option>
-            <option value="28" ${item.taxRate === 28 ? 'selected' : ''}>28%</option>
-          </select>
-        </div>
-      </div>
-    `;
-
-    // Hook inputs
-    card.querySelector('.item-desc').addEventListener('input', (e) => {
-      item.description = e.target.value;
-      calculateAndRender();
-    });
-    card.querySelector('.item-hsn').addEventListener('input', (e) => {
-      item.hsn = e.target.value;
-      calculateAndRender();
-    });
-    card.querySelector('.item-qty').addEventListener('input', (e) => {
-      item.qty = parseFloat(e.target.value) || 0;
-      updateCardBadge(card, item);
-      calculateAndRender();
-    });
-    card.querySelector('.item-unit').addEventListener('input', (e) => {
-      item.unit = e.target.value;
-      calculateAndRender();
-    });
-    card.querySelector('.item-rate').addEventListener('input', (e) => {
-      item.rate = parseFloat(e.target.value) || 0;
-      updateCardBadge(card, item);
-      calculateAndRender();
-    });
-    card.querySelector('.item-discount').addEventListener('input', (e) => {
-      item.discount = parseFloat(e.target.value) || 0;
-      updateCardBadge(card, item);
-      calculateAndRender();
-    });
-    card.querySelector('.item-tax-rate').addEventListener('change', (e) => {
-      item.taxRate = parseFloat(e.target.value) || 0;
-      updateCardBadge(card, item);
-      calculateAndRender();
-    });
-
-    const delBtn = card.querySelector('.btn-delete-item');
-    if (delBtn) {
-      delBtn.addEventListener('click', () => {
-        deleteProductItem(item.id);
-      });
-    }
-
-    container.appendChild(card);
+function calculateBillTotals() {
+  // 1. Taxable items total
+  let totalTaxable = 0;
+  currentInvoice.items.forEach(item => {
+    const qty = parseFloat(item.qty) || 0;
+    const rate = parseFloat(item.rate) || 0;
+    const amount = qty * rate;
+    item.amount = amount;
+    totalTaxable += amount;
   });
-}
 
-function updateCardBadge(card, item) {
-  const badge = card.querySelector('.item-card-total-badge');
-  if (badge) {
-    const subtotal = item.qty * item.rate;
-    const taxable = subtotal - (subtotal * (item.discount / 100));
-    const total = taxable + (taxable * (item.taxRate / 100));
-    badge.textContent = formatCurrency(total, invoiceState.currencySymbol);
-  }
-}
-
-function addNewProductItem() {
-  const newId = 'item-' + Date.now();
-  invoiceState.items.push({
-    id: newId,
-    description: 'New Product Item',
-    hsn: '9983',
-    qty: 1,
-    unit: 'Units',
-    rate: 1000,
-    discount: 0,
-    taxRate: 18
-  });
-  renderProductEditorCards();
-  calculateAndRender();
-  showToast('New product item added', 'info');
-}
-
-function deleteProductItem(id) {
-  if (invoiceState.items.length <= 1) {
-    showToast('At least one line item is required.', 'info');
-    return;
-  }
-  invoiceState.items = invoiceState.items.filter(it => it.id !== id);
-  renderProductEditorCards();
-  calculateAndRender();
-  showToast('Item deleted', 'info');
-}
-
-// =============================================================================
-// 7. Core Calculation & Live Invoice Sheet Renderer
-// =============================================================================
-function calculateAndRender() {
-  const curr = invoiceState.currencySymbol;
-  document.querySelectorAll('.currency-label').forEach(el => el.textContent = curr);
-
-  // 1. Sync Top Headers & Logo
-  document.getElementById('view-inv-type').textContent = invoiceState.invoiceType;
-  document.getElementById('view-copy-type').textContent = invoiceState.copyType;
-
-  const logoImg = document.getElementById('view-company-logo');
-  if (logoImg) {
-    if (invoiceState.logo.src) {
-      logoImg.src = invoiceState.logo.src;
-      logoImg.style.height = `${invoiceState.logo.height}px`;
-      logoImg.style.display = 'block';
+  // 2. Tax Mode Resolution (Intra 9%+9% or Inter 18%)
+  let taxMode = currentInvoice.taxMode;
+  if (currentInvoice.autoDetectTax) {
+    const buyerCode = (currentInvoice.buyer.stateCode || '').trim();
+    if (buyerCode && buyerCode !== '09') {
+      taxMode = 'inter';
     } else {
-      logoImg.style.display = 'none';
+      taxMode = 'intra';
     }
   }
 
-  // 2. Sync Invoice Meta
-  document.getElementById('view-inv-number').textContent = invoiceState.invoiceNumber;
-  document.getElementById('view-inv-date').textContent = formatDateDisplay(invoiceState.invoiceDate);
-  document.getElementById('view-inv-due-date').textContent = formatDateDisplay(invoiceState.dueDate);
-  document.getElementById('view-place-of-supply').textContent = invoiceState.placeOfSupply;
+  let sgstAmount = 0;
+  let cgstAmount = 0;
+  let igstAmount = 0;
+  let totalGst = 0;
 
-  const supplyBadge = document.getElementById('view-supply-type-badge');
-  if (supplyBadge) {
-    supplyBadge.textContent = invoiceState.gstSupplyType === 'intra'
-      ? 'Intra-State (CGST + SGST)'
-      : 'Inter-State (IGST)';
+  if (taxMode === 'intra') {
+    sgstAmount = totalTaxable * 0.09;
+    cgstAmount = totalTaxable * 0.09;
+    totalGst = sgstAmount + cgstAmount;
+  } else if (taxMode === 'inter') {
+    igstAmount = totalTaxable * 0.18;
+    totalGst = igstAmount;
   }
 
-  // 3. Sync Supplier Details
-  document.getElementById('view-supplier-name').textContent = invoiceState.supplier.name;
-  document.getElementById('view-supplier-address').textContent = invoiceState.supplier.address;
-  document.getElementById('view-supplier-gstin').textContent = invoiceState.supplier.gstin;
-  document.getElementById('view-supplier-pan').textContent = invoiceState.supplier.pan;
-  document.getElementById('view-supplier-state').textContent = `${invoiceState.supplier.state} (${invoiceState.supplier.stateCode})`;
-  document.getElementById('view-supplier-contact').textContent = invoiceState.supplier.phone;
-  document.getElementById('view-supplier-email').textContent = invoiceState.supplier.email;
+  // 3. Raw Total
+  const rawTotal = totalTaxable + totalGst;
 
-  // Validate Supplier GSTIN display
-  validateGSTINBadge('supplier-gstin', 'supplier-gstin-status', invoiceState.supplier.gstin);
+  // 4. Round off
+  let roundoff = 0;
+  let grandTotal = rawTotal;
 
-  // 4. Sync Buyer Details
-  document.getElementById('view-buyer-name').textContent = invoiceState.buyer.name;
-  document.getElementById('view-buyer-address').textContent = invoiceState.buyer.address;
-  document.getElementById('view-buyer-gstin').textContent = invoiceState.buyer.gstin;
-  document.getElementById('view-buyer-state').textContent = `${invoiceState.buyer.state} (${invoiceState.buyer.stateCode})`;
-  document.getElementById('view-buyer-phone').textContent = invoiceState.buyer.phone;
-  document.getElementById('view-buyer-email').textContent = invoiceState.buyer.email;
-
-  // Validate Buyer GSTIN display
-  validateGSTINBadge('buyer-gstin', 'buyer-gstin-status', invoiceState.buyer.gstin);
-
-  // Shipping
-  const shippingName = document.getElementById('view-shipping-name');
-  const shippingAddress = document.getElementById('view-shipping-address');
-  const shippingState = document.getElementById('view-shipping-state');
-  if (invoiceState.buyer.sameShipping) {
-    shippingName.textContent = invoiceState.buyer.name;
-    shippingAddress.textContent = invoiceState.buyer.address;
-    shippingState.textContent = `${invoiceState.buyer.state} (${invoiceState.buyer.stateCode})`;
+  if (currentInvoice.autoRoundoff) {
+    const rounded = Math.round(rawTotal);
+    roundoff = rounded - rawTotal;
+    grandTotal = rounded;
   } else {
-    shippingName.textContent = invoiceState.buyer.name;
-    shippingAddress.textContent = invoiceState.buyer.shippingAddress || invoiceState.buyer.address;
-    shippingState.textContent = `${invoiceState.buyer.state} (${invoiceState.buyer.stateCode})`;
+    roundoff = parseFloat(currentInvoice.customRoundoff) || 0;
+    grandTotal = rawTotal + roundoff;
   }
 
-  // 5. Render Products Table on the Sheet & Perform Totals Computation
+  // 5. Material Ledger (Zinc Job Work Calculations)
+  const matOpening = parseFloat(currentInvoice.material.opening) || 0;
+  const matReceived = parseFloat(currentInvoice.material.received) || 0;
+  const matTotal = matOpening + matReceived;
+  const matDelivered = parseFloat(currentInvoice.material.delivered) || 0;
+  const matLoss = parseFloat(currentInvoice.material.loss) || 0;
+  const matReturned = parseFloat(currentInvoice.material.returned) || 0;
+  const matBalance = matTotal - matDelivered - matLoss - matReturned;
+
+  return {
+    totalTaxable,
+    taxMode,
+    sgstAmount,
+    cgstAmount,
+    igstAmount,
+    totalGst,
+    roundoff,
+    grandTotal,
+    material: {
+      opening: matOpening,
+      received: matReceived,
+      total: matTotal,
+      delivered: matDelivered,
+      loss: matLoss,
+      returned: matReturned,
+      balance: matBalance
+    }
+  };
+}
+
+// =============================================================================
+// 5. DOM Synchronization: Update View (Live Preview Sheet)
+// =============================================================================
+function renderInvoiceSheet() {
+  const totals = calculateBillTotals();
+
+  // 1. Seller Information (Strictly Locked to S K ENTERPRISES)
+  document.getElementById('view-seller-name').textContent = FIXED_SELLER.name;
+  document.getElementById('view-seller-address').textContent = FIXED_SELLER.address;
+  document.getElementById('view-seller-mobile').textContent = FIXED_SELLER.mobile;
+  document.getElementById('view-seller-gstin').textContent = FIXED_SELLER.gstin;
+  document.getElementById('view-seller-statecode').textContent = FIXED_SELLER.stateCode;
+
+  // 2. Invoice Meta
+  document.getElementById('view-inv-number').textContent = currentInvoice.invoiceNumber || '001';
+  document.getElementById('view-inv-date').textContent = formatDateDDMMYYYY(currentInvoice.invoiceDate);
+  document.getElementById('view-copy-type').textContent = currentInvoice.copyType || 'ORIGINAL';
+  document.getElementById('view-inv-category').textContent = currentInvoice.category || 'JOB WORK';
+
+  // 3. Buyer Details ("Billed To:")
+  document.getElementById('view-buyer-name').textContent = currentInvoice.buyer.name || 'M/s SREE CORPORATION';
+  document.getElementById('view-buyer-addr1').textContent = currentInvoice.buyer.addr1 || '';
+  document.getElementById('view-buyer-addr2').textContent = currentInvoice.buyer.addr2 || '';
+  document.getElementById('view-buyer-city-pin').textContent = currentInvoice.buyer.cityPin || '';
+  document.getElementById('view-buyer-gstin').textContent = currentInvoice.buyer.gstin || '';
+  document.getElementById('view-buyer-state').textContent = currentInvoice.buyer.state || '';
+  document.getElementById('view-buyer-statecode').textContent = currentInvoice.buyer.stateCode || '';
+
+  // 4. Details of Consignment
+  document.getElementById('view-cons-transport').textContent = currentInvoice.consignment.transport || '';
+  document.getElementById('view-cons-lr-no').textContent = currentInvoice.consignment.lrNo || '';
+  document.getElementById('view-cons-veh-no').textContent = currentInvoice.consignment.vehNo || '';
+  document.getElementById('view-cons-ewb-no').textContent = currentInvoice.consignment.ewbNo || '';
+  document.getElementById('view-cons-place-supply').textContent = currentInvoice.consignment.placeOfSupply || '';
+  document.getElementById('view-cons-no-cases').textContent = currentInvoice.consignment.noOfCases || '';
+  document.getElementById('view-cons-reverse-charge').textContent = currentInvoice.consignment.reverseCharge || '';
+  document.getElementById('view-cons-weight').textContent = formatQty(currentInvoice.consignment.weight);
+  document.getElementById('view-cons-freight').textContent = (currentInvoice.consignment.freight || 0).toString();
+
+  // 5. Line Items Table
   const tbody = document.getElementById('view-items-tbody');
   tbody.innerHTML = '';
 
-  let totalTaxableValue = 0;
-  let totalCGST = 0;
-  let totalSGST = 0;
-  let totalIGST = 0;
-
-  invoiceState.items.forEach((item, idx) => {
-    const subtotal = item.qty * item.rate;
-    const discountAmount = subtotal * (item.discount / 100);
-    const taxableValue = subtotal - discountAmount;
-    const taxAmount = taxableValue * (item.taxRate / 100);
-    const lineTotal = taxableValue + taxAmount;
-
-    totalTaxableValue += taxableValue;
-
-    if (invoiceState.gstSupplyType === 'intra') {
-      totalCGST += taxAmount / 2;
-      totalSGST += taxAmount / 2;
-    } else {
-      totalIGST += taxAmount;
-    }
-
+  currentInvoice.items.forEach((item, index) => {
     const tr = document.createElement('tr');
+    tr.className = 'item-data-row';
     tr.innerHTML = `
-      <td class="col-sr">${idx + 1}</td>
-      <td class="col-desc">
-        <div class="item-desc-title">${escapeHTML(item.description)}</div>
-      </td>
-      <td class="col-hsn">${escapeHTML(item.hsn || '-')}</td>
-      <td class="col-qty">${item.qty}</td>
-      <td class="col-unit">${escapeHTML(item.unit || 'Nos')}</td>
-      <td class="col-rate">${item.rate.toFixed(2)}</td>
-      <td class="col-disc">${item.discount ? item.discount + '%' : '-'}</td>
-      <td class="col-taxable">${taxableValue.toFixed(2)}</td>
-      <td class="col-tax-rate">${item.taxRate}%</td>
-      <td class="col-total">${lineTotal.toFixed(2)}</td>
+      <td class="cell-sno">${index + 1}</td>
+      <td class="cell-particulars">${item.particulars || ''}</td>
+      <td class="cell-hsn">${item.hsn || ''}</td>
+      <td class="cell-qty">${formatQty(item.qty)}</td>
+      <td class="cell-rate">${Number(item.rate || 0).toFixed(0)}</td>
+      <td class="cell-amount">${Number(item.amount || 0).toFixed(2)}</td>
     `;
     tbody.appendChild(tr);
   });
 
-  // Calculate Net Grand Total
-  let rawGrandTotal = totalTaxableValue + totalCGST + totalSGST + totalIGST;
-
-  // Apply Special Discount & Shipping
-  if (invoiceState.overallDiscount > 0) {
-    rawGrandTotal -= invoiceState.overallDiscount;
-  }
-  if (invoiceState.shippingCharges > 0) {
-    rawGrandTotal += invoiceState.shippingCharges;
-  }
-
-  let finalGrandTotal = rawGrandTotal;
-  let roundOffAmount = 0;
-
-  if (invoiceState.autoRoundoff) {
-    finalGrandTotal = Math.round(rawGrandTotal);
-    roundOffAmount = finalGrandTotal - rawGrandTotal;
+  // Add blank spacer rows so the table maintains realistic invoice height
+  const blankRowsNeeded = Math.max(0, 5 - currentInvoice.items.length);
+  for (let i = 0; i < blankRowsNeeded; i++) {
+    const tr = document.createElement('tr');
+    tr.className = 'blank-item-row';
+    tr.innerHTML = `
+      <td>&nbsp;</td>
+      <td>&nbsp;</td>
+      <td>&nbsp;</td>
+      <td>&nbsp;</td>
+      <td>&nbsp;</td>
+      <td>&nbsp;</td>
+    `;
+    tbody.appendChild(tr);
   }
 
-  // Ensure non-negative
-  if (finalGrandTotal < 0) finalGrandTotal = 0;
+  // 6. Subtotals Block (Bottom Right of Items Table)
+  document.getElementById('view-total-taxable').textContent = Number(totals.totalTaxable).toFixed(2);
 
-  // 6. Update Calculations Table
-  document.getElementById('view-total-taxable').textContent = formatCurrency(totalTaxableValue, curr);
+  const rowSgst = document.getElementById('row-view-sgst');
+  const rowCgst = document.getElementById('row-view-cgst');
+  const rowIgst = document.getElementById('row-view-igst');
 
-  const rowCGST = document.getElementById('row-cgst');
-  const rowSGST = document.getElementById('row-sgst');
-  const rowIGST = document.getElementById('row-igst');
-
-  if (invoiceState.gstSupplyType === 'intra') {
-    rowCGST.style.display = 'table-row';
-    rowSGST.style.display = 'table-row';
-    rowIGST.style.display = 'none';
-    document.getElementById('view-total-cgst').textContent = formatCurrency(totalCGST, curr);
-    document.getElementById('view-total-sgst').textContent = formatCurrency(totalSGST, curr);
+  if (totals.taxMode === 'intra') {
+    rowSgst.style.display = '';
+    rowCgst.style.display = '';
+    rowIgst.style.display = 'none';
+    document.getElementById('view-total-sgst').textContent = Number(totals.sgstAmount).toFixed(2);
+    document.getElementById('view-total-cgst').textContent = Number(totals.cgstAmount).toFixed(2);
+  } else if (totals.taxMode === 'inter') {
+    rowSgst.style.display = 'none';
+    rowCgst.style.display = 'none';
+    rowIgst.style.display = '';
+    document.getElementById('view-total-igst').textContent = Number(totals.igstAmount).toFixed(2);
   } else {
-    rowCGST.style.display = 'none';
-    rowSGST.style.display = 'none';
-    rowIGST.style.display = 'table-row';
-    document.getElementById('view-total-igst').textContent = formatCurrency(totalIGST, curr);
+    rowSgst.style.display = 'none';
+    rowCgst.style.display = 'none';
+    rowIgst.style.display = 'none';
   }
 
-  // Adjustments display
-  const rowDiscount = document.getElementById('row-discount');
-  if (invoiceState.overallDiscount > 0) {
-    rowDiscount.style.display = 'table-row';
-    document.getElementById('view-total-discount').textContent = `- ${formatCurrency(invoiceState.overallDiscount, curr)}`;
+  // Round off display
+  const roundoffRow = document.getElementById('row-view-roundoff');
+  if (Math.abs(totals.roundoff) > 0.001) {
+    roundoffRow.style.display = '';
+    const prefix = totals.roundoff >= 0 ? '+' : '';
+    document.getElementById('view-total-roundoff').textContent = prefix + Number(totals.roundoff).toFixed(2);
   } else {
-    rowDiscount.style.display = 'none';
+    document.getElementById('view-total-roundoff').textContent = '0.00';
   }
 
-  const rowShipping = document.getElementById('row-shipping');
-  if (invoiceState.shippingCharges > 0) {
-    rowShipping.style.display = 'table-row';
-    document.getElementById('view-total-shipping').textContent = `+ ${formatCurrency(invoiceState.shippingCharges, curr)}`;
+  // Grand Total
+  document.getElementById('view-grand-total').textContent = Number(totals.grandTotal).toFixed(2);
+  document.getElementById('quick-total-display').textContent = 'Rs. ' + formatCurrency(totals.grandTotal);
+
+  // 7. Amount Chargeable in Words
+  let wordsText = currentInvoice.wordsOverride;
+  if (!wordsText) {
+    wordsText = numberToIndianWords(totals.grandTotal);
+  }
+  document.getElementById('view-amount-in-words').textContent = wordsText;
+
+  // 8. Tax Summary Table Box
+  document.getElementById('view-sum-taxable').textContent = Number(totals.totalTaxable).toFixed(2);
+  if (totals.taxMode === 'intra') {
+    document.getElementById('th-sum-sgst').textContent = '9% SGST';
+    document.getElementById('th-sum-cgst').textContent = '9% CGST';
+    document.getElementById('view-sum-sgst').textContent = Number(totals.sgstAmount).toFixed(2);
+    document.getElementById('view-sum-cgst').textContent = Number(totals.cgstAmount).toFixed(2);
   } else {
-    rowShipping.style.display = 'none';
+    document.getElementById('th-sum-sgst').textContent = 'IGST';
+    document.getElementById('th-sum-cgst').textContent = '-';
+    document.getElementById('view-sum-sgst').textContent = Number(totals.igstAmount).toFixed(2);
+    document.getElementById('view-sum-cgst').textContent = '0.00';
   }
+  document.getElementById('view-sum-total-gst').textContent = Number(totals.totalGst).toFixed(2);
 
-  document.getElementById('view-total-roundoff').textContent = (roundOffAmount >= 0 ? '+ ' : '- ') + formatCurrency(Math.abs(roundOffAmount), curr);
-  document.getElementById('view-grand-total').textContent = formatCurrency(finalGrandTotal, curr);
-  document.getElementById('quick-total-display').textContent = formatCurrency(finalGrandTotal, curr);
+  // 9. Details of Material Block (Zinc Job Work Ledger)
+  const matContainer = document.getElementById('view-material-container');
+  if (currentInvoice.material.show) {
+    matContainer.style.display = '';
+    document.getElementById('view-mat-date').textContent = formatDateDDMMYYYY(currentInvoice.material.date);
+    document.getElementById('view-mat-opening').textContent = formatQty(totals.material.opening);
+    document.getElementById('view-mat-received').textContent = formatQty(totals.material.received);
+    document.getElementById('view-mat-total').textContent = formatQty(totals.material.total);
+    document.getElementById('view-mat-delivered').textContent = formatQty(totals.material.delivered);
+    document.getElementById('view-mat-loss').textContent = formatQty(totals.material.loss);
+    document.getElementById('view-mat-returned').textContent = totals.material.returned > 0 ? formatQty(totals.material.returned) : '';
+    document.getElementById('view-mat-balance').textContent = formatQty(totals.material.balance);
 
-  // 7. TOTAL AMOUNT IN WORDS (Auto converted in real-time)
-  const wordsString = getFormattedAmountInWords(finalGrandTotal, curr);
-  document.getElementById('view-amount-in-words').textContent = wordsString;
-
-  // 8. Bank Details & Instant QR Code
-  document.getElementById('view-bank-name').textContent = invoiceState.bank.name;
-  document.getElementById('view-bank-ac').textContent = invoiceState.bank.acNumber;
-  document.getElementById('view-bank-ifsc').textContent = invoiceState.bank.ifsc;
-  document.getElementById('view-bank-branch').textContent = invoiceState.bank.branch;
-  document.getElementById('view-bank-upi').textContent = invoiceState.bank.upi;
-
-  const qrContainer = document.getElementById('view-qr-container');
-  if (invoiceState.bank.showQr === 'yes') {
-    qrContainer.style.display = 'flex';
-    drawUPIQRCode('upi-qr-canvas', invoiceState.bank.upi, invoiceState.supplier.name, finalGrandTotal);
+    // Sidebar indicators
+    document.getElementById('mat-total').value = totals.material.total.toFixed(3);
+    document.getElementById('mat-balance').value = totals.material.balance.toFixed(3);
+    document.getElementById('metric-mat-total').textContent = `${totals.material.total.toFixed(3)} Kg`;
+    document.getElementById('metric-mat-used').textContent = `${(totals.material.delivered + totals.material.loss).toFixed(3)} Kg`;
+    document.getElementById('metric-mat-bal').textContent = `${totals.material.balance.toFixed(3)} Kg`;
   } else {
-    qrContainer.style.display = 'none';
+    matContainer.style.display = 'none';
   }
 
-  // 9. Terms and Notes
-  document.getElementById('view-inv-terms').innerHTML = escapeHTML(invoiceState.terms).replace(/\n/g, '<br>');
-  document.getElementById('view-inv-notes').textContent = invoiceState.notes;
+  // 10. Bank Details (Strictly Locked)
+  document.getElementById('view-bank-name').textContent = FIXED_SELLER.bankName;
+  document.getElementById('view-bank-branch').textContent = FIXED_SELLER.branch;
+  document.getElementById('view-bank-ac').textContent = FIXED_SELLER.acNo;
+  document.getElementById('view-bank-ifsc').textContent = FIXED_SELLER.ifsc;
 
-  // 10. Seller Stamp and Signature Section
-  document.getElementById('view-sig-company-name').textContent = invoiceState.supplier.name.toUpperCase();
-  document.getElementById('view-signatory-name').textContent = invoiceState.signature.signatoryName;
-  document.getElementById('view-signatory-designation').textContent = invoiceState.signature.signatoryDesignation;
+  // 11. Signatory & Stamp
+  const stampEl = document.getElementById('view-rubber-stamp');
+  stampEl.style.display = currentInvoice.stamp.show ? 'block' : 'none';
+  stampEl.style.transform = `rotate(${currentInvoice.stamp.rotation}deg)`;
 
-  // Rubber Stamp
-  const stampOverlay = document.getElementById('view-rubber-stamp');
-  const stampImg = document.getElementById('view-stamp-img');
-  if (invoiceState.stamp.visible) {
-    stampOverlay.style.display = 'flex';
-    stampOverlay.style.transform = `translateY(-50%) rotate(${invoiceState.stamp.rotation}deg)`;
-    if (invoiceState.stamp.customSrc) {
-      stampImg.src = invoiceState.stamp.customSrc;
-    } else {
-      // Dynamic SVG Stamp generation with custom text and color
-      stampImg.src = generateDynamicRubberStampSVG(invoiceState.stamp.company, invoiceState.stamp.color);
-    }
-  } else {
-    stampOverlay.style.display = 'none';
-  }
-
-  // Seller Signature
-  const sigOverlay = document.getElementById('view-seller-signature');
+  const sigEl = document.getElementById('view-seller-signature');
   const sigImg = document.getElementById('view-sig-img');
-  if (invoiceState.signature.visible) {
-    sigOverlay.style.display = 'flex';
-    if (invoiceState.signature.dataUrl) {
-      sigImg.src = invoiceState.signature.dataUrl;
-      sigImg.style.display = 'block';
-    } else {
-      sigImg.style.display = 'none';
-    }
+  if (currentInvoice.signature.show && currentInvoice.signature.dataUrl) {
+    sigEl.style.display = 'block';
+    sigImg.src = currentInvoice.signature.dataUrl;
+    sigImg.style.display = 'block';
   } else {
-    sigOverlay.style.display = 'none';
+    sigEl.style.display = 'none';
+    sigImg.style.display = 'none';
   }
-}
 
-// Generate dynamic rubber stamp SVG Data URI based on company name and ink color
-function generateDynamicRubberStampSVG(companyName, color) {
-  const safeName = escapeHTML(companyName.toUpperCase() || 'OFFICIAL INVOICE SEAL');
-  const svgString = `
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
-    <defs>
-      <path id="dynCircleTextPath" d="M 100, 100 m -68, 0 a 68,68 0 1,1 136,0 a 68,68 0 1,1 -136,0" />
-    </defs>
-    <g opacity="0.88">
-      <circle cx="100" cy="100" r="92" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round" />
-      <circle cx="100" cy="100" r="84" fill="none" stroke="${color}" stroke-width="1.5" />
-      <circle cx="100" cy="100" r="56" fill="none" stroke="${color}" stroke-width="1.8" />
-      <circle cx="100" cy="100" r="52" fill="none" stroke="${color}" stroke-width="1" />
-      
-      <text font-family="'Inter', Arial, sans-serif" font-size="10.5" font-weight="900" fill="${color}" letter-spacing="2.2">
-        <textPath href="#dynCircleTextPath" startOffset="50%" text-anchor="middle">
-          ★ ${safeName} ★
-        </textPath>
-      </text>
-
-      <rect x="25" y="85" width="150" height="30" rx="3" fill="${color}" fill-opacity="0.12" stroke="${color}" stroke-width="1.5" />
-      <text x="100" y="99" font-family="'Inter', Arial, sans-serif" font-size="12" font-weight="900" fill="${color}" text-anchor="middle" letter-spacing="1.5">
-        AUTHORIZED
-      </text>
-      <text x="100" y="110" font-family="'Inter', Arial, sans-serif" font-size="8.5" font-weight="800" fill="${color}" text-anchor="middle" letter-spacing="1">
-        SIGNATORY &amp; STAMP
-      </text>
-      <text x="100" y="132" font-family="'Inter', Arial, sans-serif" font-size="8" font-weight="700" fill="${color}" text-anchor="middle" letter-spacing="1">
-        OFFICIALLY VERIFIED
-      </text>
-      <text x="100" y="74" font-family="'Inter', Arial, sans-serif" font-size="8" font-weight="700" fill="${color}" text-anchor="middle" letter-spacing="1.5">
-        GOVT REG. INVOICE
-      </text>
-    </g>
-  </svg>
-  `;
-  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgString)}`;
+  document.getElementById('view-sign-caption').textContent = currentInvoice.signature.caption || FIXED_SELLER.signCaption;
 }
 
 // =============================================================================
-// 8. GSTIN Format Validator
+// 6. DOM Synchronization: Update Editor Fields from State
 // =============================================================================
-function validateGSTINBadge(inputId, statusId, gstinValue) {
-  const statusEl = document.getElementById(statusId);
-  if (!statusEl) return;
-  const val = (gstinValue || '').trim().toUpperCase();
-  if (!val) {
-    statusEl.textContent = '';
+function populateEditorFields() {
+  // Invoice Meta
+  document.getElementById('inv-number').value = currentInvoice.invoiceNumber;
+  document.getElementById('inv-date').value = currentInvoice.invoiceDate;
+  document.getElementById('inv-copy-type').value = currentInvoice.copyType;
+
+  // Buyer Details
+  document.getElementById('buyer-name').value = currentInvoice.buyer.name || '';
+  document.getElementById('buyer-addr1').value = currentInvoice.buyer.addr1 || '';
+  document.getElementById('buyer-addr2').value = currentInvoice.buyer.addr2 || '';
+  document.getElementById('buyer-city-pin').value = currentInvoice.buyer.cityPin || '';
+  document.getElementById('buyer-gstin').value = currentInvoice.buyer.gstin || '';
+  document.getElementById('buyer-state').value = currentInvoice.buyer.state || '';
+  document.getElementById('buyer-state-code').value = currentInvoice.buyer.stateCode || '';
+
+  // Consignment Details
+  document.getElementById('cons-transport').value = currentInvoice.consignment.transport || '';
+  document.getElementById('cons-lr-no').value = currentInvoice.consignment.lrNo || '';
+  document.getElementById('cons-veh-no').value = currentInvoice.consignment.vehNo || '';
+  document.getElementById('cons-ewb-no').value = currentInvoice.consignment.ewbNo || '';
+  document.getElementById('cons-place-supply').value = currentInvoice.consignment.placeOfSupply || '';
+  document.getElementById('cons-no-cases').value = currentInvoice.consignment.noOfCases || '';
+  document.getElementById('cons-reverse-charge').value = currentInvoice.consignment.reverseCharge || '';
+  document.getElementById('cons-weight').value = currentInvoice.consignment.weight || 0;
+  document.getElementById('cons-freight').value = currentInvoice.consignment.freight || 0;
+
+  // Items Render
+  renderItemEditorCards();
+
+  // Taxes & Round off
+  document.getElementById('tax-mode').value = currentInvoice.taxMode;
+  document.getElementById('auto-detect-tax').checked = currentInvoice.autoDetectTax;
+  document.getElementById('toggle-roundoff').checked = currentInvoice.autoRoundoff;
+  document.getElementById('custom-roundoff').value = currentInvoice.customRoundoff;
+  document.getElementById('custom-roundoff').disabled = currentInvoice.autoRoundoff;
+  document.getElementById('words-override-input').value = currentInvoice.wordsOverride || '';
+
+  // Material Ledger
+  document.getElementById('toggle-material-table').checked = currentInvoice.material.show;
+  document.getElementById('mat-date').value = currentInvoice.material.date;
+  document.getElementById('mat-opening').value = currentInvoice.material.opening;
+  document.getElementById('mat-received').value = currentInvoice.material.received;
+  document.getElementById('mat-delivered').value = currentInvoice.material.delivered;
+  document.getElementById('mat-loss').value = currentInvoice.material.loss;
+  document.getElementById('mat-returned').value = currentInvoice.material.returned;
+
+  // Sign & Stamp
+  document.getElementById('toggle-stamp').checked = currentInvoice.stamp.show;
+  document.getElementById('stamp-color').value = currentInvoice.stamp.color;
+  document.getElementById('stamp-rotation').value = currentInvoice.stamp.rotation;
+  document.getElementById('toggle-signature').checked = currentInvoice.signature.show;
+  document.getElementById('signatory-label').value = currentInvoice.signature.caption;
+
+  // Refresh saved counts
+  updateSavedInvoiceCount();
+  populateSavedBuyerDropdown();
+}
+
+// Render dynamic item cards in Editor sidebar
+function renderItemEditorCards() {
+  const container = document.getElementById('items-editor-container');
+  container.innerHTML = '';
+
+  currentInvoice.items.forEach((item, index) => {
+    const card = document.createElement('div');
+    card.className = 'item-edit-card';
+    card.dataset.itemId = item.id;
+    card.innerHTML = `
+      <div class="item-edit-header">
+        <span class="item-edit-title">Item #${index + 1}</span>
+        ${currentInvoice.items.length > 1 ? `<button type="button" class="btn-del-item" data-id="${item.id}">Delete</button>` : ''}
+      </div>
+      <div class="form-group">
+        <label>Particulars (Description) *</label>
+        <input type="text" class="form-control item-particulars" value="${item.particulars || ''}" placeholder="e.g. ZINC DIE CASTING CHARGES">
+      </div>
+      <div class="form-row">
+        <div class="form-group flex-1">
+          <label>HSN/SAC Code</label>
+          <input type="text" class="form-control item-hsn" value="${item.hsn || '9988'}" placeholder="9988">
+        </div>
+        <div class="form-group flex-1">
+          <label>Quantity (Kg)</label>
+          <input type="number" step="0.001" class="form-control item-qty" value="${item.qty || 0}">
+        </div>
+        <div class="form-group flex-1">
+          <label>Rate (Rs.)</label>
+          <input type="number" step="0.01" class="form-control item-rate" value="${item.rate || 0}">
+        </div>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+
+  document.getElementById('items-badge-count').textContent = currentInvoice.items.length;
+
+  // Attach input listeners
+  container.querySelectorAll('.item-particulars').forEach((input, idx) => {
+    input.addEventListener('input', (e) => {
+      currentInvoice.items[idx].particulars = e.target.value;
+      renderInvoiceSheet();
+    });
+  });
+
+  container.querySelectorAll('.item-hsn').forEach((input, idx) => {
+    input.addEventListener('input', (e) => {
+      currentInvoice.items[idx].hsn = e.target.value;
+      renderInvoiceSheet();
+    });
+  });
+
+  container.querySelectorAll('.item-qty').forEach((input, idx) => {
+    input.addEventListener('input', (e) => {
+      currentInvoice.items[idx].qty = parseFloat(e.target.value) || 0;
+      renderInvoiceSheet();
+    });
+  });
+
+  container.querySelectorAll('.item-rate').forEach((input, idx) => {
+    input.addEventListener('input', (e) => {
+      currentInvoice.items[idx].rate = parseFloat(e.target.value) || 0;
+      renderInvoiceSheet();
+    });
+  });
+
+  container.querySelectorAll('.btn-del-item').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const id = e.target.dataset.id;
+      currentInvoice.items = currentInvoice.items.filter(item => item.id !== id);
+      renderItemEditorCards();
+      renderInvoiceSheet();
+    });
+  });
+}
+
+// =============================================================================
+// 7. Buyer Directory Management
+// =============================================================================
+function getSavedBuyers() {
+  try {
+    const raw = localStorage.getItem('sk_saved_buyers');
+    if (raw) return JSON.parse(raw);
+  } catch (e) {
+    console.error('Error reading buyers:', e);
+  }
+  return DEFAULT_BUYERS;
+}
+
+function saveBuyersList(buyers) {
+  localStorage.setItem('sk_saved_buyers', JSON.stringify(buyers));
+  populateSavedBuyerDropdown();
+  updateBuyerDirectoryModal();
+}
+
+function populateSavedBuyerDropdown() {
+  const select = document.getElementById('select-saved-buyer');
+  const buyers = getSavedBuyers();
+  select.innerHTML = '<option value="">-- Choose Existing Buyer --</option>';
+
+  buyers.forEach(b => {
+    const opt = document.createElement('option');
+    opt.value = b.id;
+    opt.textContent = `${b.name} (${b.cityPin || b.state})`;
+    select.appendChild(opt);
+  });
+
+  const countBadge = document.getElementById('buyer-count');
+  if (countBadge) countBadge.textContent = buyers.length;
+}
+
+function loadBuyerIntoForm(buyerId) {
+  const buyers = getSavedBuyers();
+  const buyer = buyers.find(b => b.id === buyerId);
+  if (!buyer) return;
+
+  currentInvoice.buyer.name = buyer.name;
+  currentInvoice.buyer.addr1 = buyer.addr1;
+  currentInvoice.buyer.addr2 = buyer.addr2;
+  currentInvoice.buyer.cityPin = buyer.cityPin;
+  currentInvoice.buyer.gstin = buyer.gstin;
+  currentInvoice.buyer.state = buyer.state;
+  currentInvoice.buyer.stateCode = buyer.stateCode;
+
+  populateEditorFields();
+  renderInvoiceSheet();
+  showToast(`Buyer loaded: ${buyer.name}`, 'toast-success');
+}
+
+function saveCurrentBuyerToDirectory() {
+  const name = (currentInvoice.buyer.name || '').trim();
+  if (!name) {
+    showToast('Please enter a Buyer Name first.', 'toast-error');
     return;
   }
-  // Standard Indian GSTIN Regex (15 alphanumeric characters)
-  const gstinRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
-  if (gstinRegex.test(val)) {
-    statusEl.innerHTML = '<span style="color:#10b981;font-size:0.75rem;font-weight:600;">✓ Valid GSTIN Format</span>';
-  } else if (val.length < 15) {
-    statusEl.innerHTML = `<span style="color:#f59e0b;font-size:0.75rem;">${15 - val.length} characters left</span>`;
+
+  const buyers = getSavedBuyers();
+  const existingIdx = buyers.findIndex(b => b.name.toLowerCase() === name.toLowerCase());
+
+  const newBuyerObj = {
+    id: 'buyer-' + Date.now(),
+    name: currentInvoice.buyer.name,
+    addr1: currentInvoice.buyer.addr1,
+    addr2: currentInvoice.buyer.addr2,
+    cityPin: currentInvoice.buyer.cityPin,
+    gstin: currentInvoice.buyer.gstin,
+    state: currentInvoice.buyer.state,
+    stateCode: currentInvoice.buyer.stateCode
+  };
+
+  if (existingIdx >= 0) {
+    buyers[existingIdx] = newBuyerObj;
+    showToast(`Updated saved buyer: ${name}`, 'toast-success');
   } else {
-    statusEl.innerHTML = '<span style="color:#ef4444;font-size:0.75rem;font-weight:600;">⚠ Invalid GSTIN pattern</span>';
+    buyers.push(newBuyerObj);
+    showToast(`Saved ${name} to Buyer Directory`, 'toast-success');
   }
+
+  saveBuyersList(buyers);
+}
+
+function updateBuyerDirectoryModal() {
+  const listEl = document.getElementById('buyer-directory-list');
+  const countEl = document.getElementById('modal-buyer-count');
+  const buyers = getSavedBuyers();
+
+  if (countEl) countEl.textContent = `${buyers.length} Buyers`;
+  if (!listEl) return;
+
+  if (buyers.length === 0) {
+    listEl.innerHTML = '<p class="text-muted text-center py-4">No saved buyers in directory.</p>';
+    return;
+  }
+
+  listEl.innerHTML = '';
+  buyers.forEach(b => {
+    const card = document.createElement('div');
+    card.className = 'saved-item-card';
+    card.innerHTML = `
+      <div class="saved-item-info">
+        <span class="saved-item-title">${b.name}</span>
+        <span class="saved-item-meta">${b.cityPin || ''} • GSTIN: ${b.gstin || 'Unregistered'} • State: ${b.state || ''} (${b.stateCode || ''})</span>
+      </div>
+      <div class="saved-item-actions">
+        <button type="button" class="btn btn-sm btn-primary btn-load-buyer-modal" data-id="${b.id}">Load</button>
+        <button type="button" class="btn btn-sm btn-ghost text-danger btn-del-buyer-modal" data-id="${b.id}">Delete</button>
+      </div>
+    `;
+    listEl.appendChild(card);
+  });
+
+  listEl.querySelectorAll('.btn-load-buyer-modal').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      loadBuyerIntoForm(e.target.dataset.id);
+      document.getElementById('modal-buyer-directory').close();
+    });
+  });
+
+  listEl.querySelectorAll('.btn-del-buyer-modal').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const id = e.target.dataset.id;
+      const updated = getSavedBuyers().filter(b => b.id !== id);
+      saveBuyersList(updated);
+      showToast('Buyer removed from directory.', 'toast-info');
+    });
+  });
 }
 
 // =============================================================================
-// 9. Zoom and Pan Controls for Live Preview
+// 8. Saved Invoices History (LocalStorage Database)
 // =============================================================================
-let currentZoom = 1;
+function getSavedInvoices() {
+  try {
+    const raw = localStorage.getItem('sk_saved_invoices');
+    if (raw) return JSON.parse(raw);
+  } catch (e) {
+    console.error('Error reading saved invoices:', e);
+  }
+  return [];
+}
 
-function setupZoomControls() {
-  const sheetWrapper = document.getElementById('sheet-wrapper');
-  const zoomDisplay = document.getElementById('zoom-value');
-
-  document.getElementById('btn-zoom-in')?.addEventListener('click', () => {
-    if (currentZoom < 1.4) {
-      currentZoom += 0.1;
-      applyZoom();
-    }
-  });
-
-  document.getElementById('btn-zoom-out')?.addEventListener('click', () => {
-    if (currentZoom > 0.6) {
-      currentZoom -= 0.1;
-      applyZoom();
-    }
-  });
-
-  document.getElementById('btn-zoom-reset')?.addEventListener('click', () => {
-    currentZoom = 1;
-    applyZoom();
-  });
-
-  function applyZoom() {
-    if (sheetWrapper) {
-      sheetWrapper.style.transform = `scale(${currentZoom.toFixed(2)})`;
-    }
-    if (zoomDisplay) {
-      zoomDisplay.textContent = `${Math.round(currentZoom * 100)}%`;
-    }
+function updateSavedInvoiceCount() {
+  const countEl = document.getElementById('saved-count');
+  if (countEl) {
+    countEl.textContent = getSavedInvoices().length;
   }
 }
 
-// =============================================================================
-// 10. Saved Invoices Management (Local Storage + JSON Export/Import)
-// =============================================================================
-const STORAGE_KEY = 'apexbill_saved_invoices';
+function saveCurrentInvoice() {
+  const invoices = getSavedInvoices();
+  const invoiceId = currentInvoice.invoiceNumber || 'INV-' + Date.now();
+  const totals = calculateBillTotals();
 
-function setupSavedInvoicesManager() {
-  const modal = document.getElementById('modal-saved-invoices');
-  const btnOpen = document.getElementById('btn-saved-list');
-  const btnClose1 = document.getElementById('btn-close-saved-modal');
-  const btnClose2 = document.getElementById('btn-close-saved-modal-2');
-  const btnSave = document.getElementById('btn-save-draft');
+  const record = {
+    id: invoiceId,
+    timestamp: new Date().toISOString(),
+    invoiceNumber: currentInvoice.invoiceNumber,
+    invoiceDate: currentInvoice.invoiceDate,
+    buyerName: currentInvoice.buyer.name || 'Unspecified Buyer',
+    grandTotal: totals.grandTotal,
+    data: JSON.parse(JSON.stringify(currentInvoice))
+  };
 
-  btnSave?.addEventListener('click', () => {
+  const existingIndex = invoices.findIndex(inv => inv.id === invoiceId);
+  if (existingIndex >= 0) {
+    invoices[existingIndex] = record;
+    showToast(`Invoice #${invoiceId} updated in history!`, 'toast-success');
+  } else {
+    invoices.unshift(record);
+    showToast(`Invoice #${invoiceId} saved to database!`, 'toast-success');
+  }
+
+  localStorage.setItem('sk_saved_invoices', JSON.stringify(invoices));
+  updateSavedInvoiceCount();
+}
+
+function updateSavedInvoicesModal(query = '') {
+  const listEl = document.getElementById('saved-invoices-list');
+  const countBadge = document.getElementById('modal-invoice-count');
+  const invoices = getSavedInvoices();
+
+  let filtered = invoices;
+  if (query.trim()) {
+    const q = query.toLowerCase();
+    filtered = invoices.filter(inv => 
+      (inv.invoiceNumber && inv.invoiceNumber.toLowerCase().includes(q)) ||
+      (inv.buyerName && inv.buyerName.toLowerCase().includes(q))
+    );
+  }
+
+  if (countBadge) countBadge.textContent = `${invoices.length} Invoices`;
+
+  if (filtered.length === 0) {
+    listEl.innerHTML = '<p class="text-muted text-center py-4">No matching invoices found.</p>';
+    return;
+  }
+
+  listEl.innerHTML = '';
+  filtered.forEach(inv => {
+    const card = document.createElement('div');
+    card.className = 'saved-item-card';
+    card.innerHTML = `
+      <div class="saved-item-info">
+        <span class="saved-item-title">Invoice #${inv.invoiceNumber} - ${inv.buyerName}</span>
+        <span class="saved-item-meta">Date: ${formatDateDDMMYYYY(inv.invoiceDate)} • Total: Rs. ${formatCurrency(inv.grandTotal)}</span>
+      </div>
+      <div class="saved-item-actions">
+        <button type="button" class="btn btn-sm btn-primary btn-load-saved-inv" data-id="${inv.id}">Open</button>
+        <button type="button" class="btn btn-sm btn-ghost text-danger btn-del-saved-inv" data-id="${inv.id}">Delete</button>
+      </div>
+    `;
+    listEl.appendChild(card);
+  });
+
+  listEl.querySelectorAll('.btn-load-saved-inv').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const id = e.target.dataset.id;
+      const target = invoices.find(i => i.id === id);
+      if (target) {
+        currentInvoice = JSON.parse(JSON.stringify(target.data));
+        populateEditorFields();
+        renderInvoiceSheet();
+        document.getElementById('modal-saved-invoices').close();
+        showToast(`Loaded Invoice #${target.invoiceNumber}`, 'toast-success');
+      }
+    });
+  });
+
+  listEl.querySelectorAll('.btn-del-saved-inv').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const id = e.target.dataset.id;
+      const updated = invoices.filter(i => i.id !== id);
+      localStorage.setItem('sk_saved_invoices', JSON.stringify(updated));
+      updateSavedInvoiceCount();
+      updateSavedInvoicesModal(query);
+      showToast('Invoice removed from database.', 'toast-info');
+    });
+  });
+}
+
+// =============================================================================
+// 9. Signature Pad (HTML5 Canvas)
+// =============================================================================
+function initSignaturePad() {
+  const canvas = document.getElementById('signature-pad');
+  if (!canvas) return;
+
+  const ctx = canvas.getContext('2d');
+  let isDrawing = false;
+  let currentColor = '#1e293b';
+
+  function resizeCanvas() {
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * 2;
+    canvas.height = rect.height * 2;
+    ctx.scale(2, 2);
+    ctx.lineWidth = 2.2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = currentColor;
+  }
+  resizeCanvas();
+
+  function startDrawing(e) {
+    isDrawing = true;
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX || (e.touches && e.touches[0].clientX)) - rect.left;
+    const y = (e.clientY || (e.touches && e.touches[0].clientY)) - rect.top;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    document.getElementById('signature-hint').style.display = 'none';
+  }
+
+  function draw(e) {
+    if (!isDrawing) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX || (e.touches && e.touches[0].clientX)) - rect.left;
+    const y = (e.clientY || (e.touches && e.touches[0].clientY)) - rect.top;
+    ctx.lineTo(x, y);
+    ctx.stroke();
+  }
+
+  function stopDrawing() {
+    if (!isDrawing) return;
+    isDrawing = false;
+    currentInvoice.signature.dataUrl = canvas.toDataURL('image/png');
+    currentInvoice.signature.show = true;
+    document.getElementById('toggle-signature').checked = true;
+    renderInvoiceSheet();
+  }
+
+  canvas.addEventListener('mousedown', startDrawing);
+  canvas.addEventListener('mousemove', draw);
+  window.addEventListener('mouseup', stopDrawing);
+
+  canvas.addEventListener('touchstart', (e) => { e.preventDefault(); startDrawing(e); }, { passive: false });
+  canvas.addEventListener('touchmove', (e) => { e.preventDefault(); draw(e); }, { passive: false });
+  window.addEventListener('touchend', stopDrawing);
+
+  // Pen color picker
+  document.querySelectorAll('.pen-dot').forEach(dot => {
+    dot.addEventListener('click', (e) => {
+      document.querySelectorAll('.pen-dot').forEach(d => d.classList.remove('active'));
+      e.target.classList.add('active');
+      currentColor = e.target.dataset.color;
+      ctx.strokeStyle = currentColor;
+    });
+  });
+
+  // Clear signature button
+  document.getElementById('btn-clear-sig').addEventListener('click', () => {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    currentInvoice.signature.dataUrl = '';
+    currentInvoice.signature.show = false;
+    document.getElementById('toggle-signature').checked = false;
+    document.getElementById('signature-hint').style.display = 'block';
+    renderInvoiceSheet();
+  });
+
+  // Signature file upload
+  document.getElementById('input-sig-file').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        currentInvoice.signature.dataUrl = event.target.result;
+        currentInvoice.signature.show = true;
+        document.getElementById('toggle-signature').checked = true;
+        renderInvoiceSheet();
+        showToast('Signature image uploaded!', 'toast-success');
+      };
+      reader.readAsDataURL(file);
+    }
+  });
+}
+
+// =============================================================================
+// 10. Toast Notification System
+// =============================================================================
+function showToast(message, type = 'toast-info') {
+  const container = document.getElementById('toast-container');
+  if (!container) return;
+
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.textContent = message;
+
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(10px)';
+    toast.style.transition = 'all 0.3s ease';
+    setTimeout(() => toast.remove(), 300);
+  }, 2800);
+}
+
+// =============================================================================
+// 11. Event Listeners Setup
+// =============================================================================
+function setupEventListeners() {
+  // Sidebar Tabs
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      const targetTab = e.currentTarget.dataset.tab;
+      e.currentTarget.classList.add('active');
+      document.getElementById(targetTab).classList.add('active');
+    });
+  });
+
+  // Buyer Presets Select
+  document.getElementById('select-saved-buyer').addEventListener('change', (e) => {
+    if (e.target.value) {
+      loadBuyerIntoForm(e.target.value);
+    }
+  });
+
+  // Save current buyer button
+  document.getElementById('btn-save-current-buyer').addEventListener('click', () => {
+    saveCurrentBuyerToDirectory();
+  });
+
+  // Reset to sample buyer (Sree Corporation)
+  document.getElementById('btn-sample-buyer').addEventListener('click', () => {
+    currentInvoice.buyer = JSON.parse(JSON.stringify(ORIGINAL_BILL_DATA.buyer));
+    populateEditorFields();
+    renderInvoiceSheet();
+    showToast('Reset to M/s Sree Corporation', 'toast-info');
+  });
+
+  // Clear buyer fields
+  document.getElementById('btn-clear-buyer').addEventListener('click', () => {
+    currentInvoice.buyer = {
+      name: '',
+      addr1: '',
+      addr2: '',
+      cityPin: '',
+      gstin: '',
+      state: 'UTTAR PRADESH',
+      stateCode: '09'
+    };
+    populateEditorFields();
+    renderInvoiceSheet();
+    showToast('Buyer fields cleared for new customer.', 'toast-info');
+  });
+
+  // Buyer Input Listeners
+  document.getElementById('buyer-name').addEventListener('input', (e) => {
+    currentInvoice.buyer.name = e.target.value;
+    renderInvoiceSheet();
+  });
+  document.getElementById('buyer-addr1').addEventListener('input', (e) => {
+    currentInvoice.buyer.addr1 = e.target.value;
+    renderInvoiceSheet();
+  });
+  document.getElementById('buyer-addr2').addEventListener('input', (e) => {
+    currentInvoice.buyer.addr2 = e.target.value;
+    renderInvoiceSheet();
+  });
+  document.getElementById('buyer-city-pin').addEventListener('input', (e) => {
+    currentInvoice.buyer.cityPin = e.target.value;
+    renderInvoiceSheet();
+  });
+  document.getElementById('buyer-gstin').addEventListener('input', (e) => {
+    const val = e.target.value.toUpperCase();
+    currentInvoice.buyer.gstin = val;
+
+    // Auto extract 2-digit state code from GSTIN
+    if (val.length >= 2 && /^\d{2}/.test(val)) {
+      const code = val.substring(0, 2);
+      currentInvoice.buyer.stateCode = code;
+      document.getElementById('buyer-state-code').value = code;
+      if (code === '09') {
+        currentInvoice.buyer.state = 'UTTAR PRADESH';
+        document.getElementById('buyer-state').value = 'UTTAR PRADESH';
+      }
+    }
+    renderInvoiceSheet();
+  });
+  document.getElementById('buyer-state-code').addEventListener('input', (e) => {
+    currentInvoice.buyer.stateCode = e.target.value;
+    renderInvoiceSheet();
+  });
+  document.getElementById('buyer-state').addEventListener('input', (e) => {
+    currentInvoice.buyer.state = e.target.value;
+    renderInvoiceSheet();
+  });
+
+  // Invoice Meta Listeners
+  document.getElementById('inv-number').addEventListener('input', (e) => {
+    currentInvoice.invoiceNumber = e.target.value;
+    renderInvoiceSheet();
+  });
+  document.getElementById('inv-date').addEventListener('change', (e) => {
+    currentInvoice.invoiceDate = e.target.value;
+    renderInvoiceSheet();
+  });
+  document.getElementById('inv-copy-type').addEventListener('change', (e) => {
+    currentInvoice.copyType = e.target.value;
+    renderInvoiceSheet();
+  });
+
+  // Consignment Details Listeners
+  document.getElementById('cons-transport').addEventListener('input', (e) => {
+    currentInvoice.consignment.transport = e.target.value;
+    renderInvoiceSheet();
+  });
+  document.getElementById('cons-lr-no').addEventListener('input', (e) => {
+    currentInvoice.consignment.lrNo = e.target.value;
+    renderInvoiceSheet();
+  });
+  document.getElementById('cons-veh-no').addEventListener('input', (e) => {
+    currentInvoice.consignment.vehNo = e.target.value;
+    renderInvoiceSheet();
+  });
+  document.getElementById('cons-ewb-no').addEventListener('input', (e) => {
+    currentInvoice.consignment.ewbNo = e.target.value;
+    renderInvoiceSheet();
+  });
+  document.getElementById('cons-place-supply').addEventListener('input', (e) => {
+    currentInvoice.consignment.placeOfSupply = e.target.value;
+    renderInvoiceSheet();
+  });
+  document.getElementById('cons-no-cases').addEventListener('input', (e) => {
+    currentInvoice.consignment.noOfCases = e.target.value;
+    renderInvoiceSheet();
+  });
+  document.getElementById('cons-reverse-charge').addEventListener('change', (e) => {
+    currentInvoice.consignment.reverseCharge = e.target.value;
+    renderInvoiceSheet();
+  });
+  document.getElementById('cons-weight').addEventListener('input', (e) => {
+    currentInvoice.consignment.weight = parseFloat(e.target.value) || 0;
+    renderInvoiceSheet();
+  });
+  document.getElementById('cons-freight').addEventListener('input', (e) => {
+    currentInvoice.consignment.freight = parseFloat(e.target.value) || 0;
+    renderInvoiceSheet();
+  });
+
+  // Line Item Presets & Addition
+  document.getElementById('btn-add-item').addEventListener('click', () => {
+    currentInvoice.items.push({
+      id: 'item-' + Date.now(),
+      particulars: 'ZINC DIE CASTING CHARGES',
+      hsn: '9988',
+      qty: 100,
+      rate: 40
+    });
+    renderItemEditorCards();
+    renderInvoiceSheet();
+    showToast('New line item added', 'toast-info');
+  });
+
+  document.querySelectorAll('.btn-chip').forEach(chip => {
+    chip.addEventListener('click', (e) => {
+      const name = e.target.dataset.name;
+      const hsn = e.target.dataset.hsn;
+      const rate = parseFloat(e.target.dataset.rate) || 40;
+      currentInvoice.items.push({
+        id: 'item-' + Date.now(),
+        particulars: name,
+        hsn: hsn,
+        qty: 100,
+        rate: rate
+      });
+      renderItemEditorCards();
+      renderInvoiceSheet();
+      showToast(`Added: ${name}`, 'toast-success');
+    });
+  });
+
+  // Tax Setup & Round off Listeners
+  document.getElementById('tax-mode').addEventListener('change', (e) => {
+    currentInvoice.taxMode = e.target.value;
+    renderInvoiceSheet();
+  });
+  document.getElementById('auto-detect-tax').addEventListener('change', (e) => {
+    currentInvoice.autoDetectTax = e.target.checked;
+    renderInvoiceSheet();
+  });
+  document.getElementById('toggle-roundoff').addEventListener('change', (e) => {
+    currentInvoice.autoRoundoff = e.target.checked;
+    document.getElementById('custom-roundoff').disabled = e.target.checked;
+    renderInvoiceSheet();
+  });
+  document.getElementById('custom-roundoff').addEventListener('input', (e) => {
+    currentInvoice.customRoundoff = parseFloat(e.target.value) || 0;
+    renderInvoiceSheet();
+  });
+  document.getElementById('words-override-input').addEventListener('input', (e) => {
+    currentInvoice.wordsOverride = e.target.value;
+    renderInvoiceSheet();
+  });
+
+  // Material Ledger Listeners
+  document.getElementById('toggle-material-table').addEventListener('change', (e) => {
+    currentInvoice.material.show = e.target.checked;
+    renderInvoiceSheet();
+  });
+  document.getElementById('mat-date').addEventListener('change', (e) => {
+    currentInvoice.material.date = e.target.value;
+    renderInvoiceSheet();
+  });
+  document.getElementById('mat-opening').addEventListener('input', (e) => {
+    currentInvoice.material.opening = parseFloat(e.target.value) || 0;
+    renderInvoiceSheet();
+  });
+  document.getElementById('mat-received').addEventListener('input', (e) => {
+    currentInvoice.material.received = parseFloat(e.target.value) || 0;
+    renderInvoiceSheet();
+  });
+  document.getElementById('mat-delivered').addEventListener('input', (e) => {
+    currentInvoice.material.delivered = parseFloat(e.target.value) || 0;
+    renderInvoiceSheet();
+  });
+  document.getElementById('mat-loss').addEventListener('input', (e) => {
+    currentInvoice.material.loss = parseFloat(e.target.value) || 0;
+    renderInvoiceSheet();
+  });
+  document.getElementById('mat-returned').addEventListener('input', (e) => {
+    currentInvoice.material.returned = parseFloat(e.target.value) || 0;
+    renderInvoiceSheet();
+  });
+
+  // Sync Qty button in Material Ledger
+  document.getElementById('btn-sync-qty').addEventListener('click', () => {
+    const totalItemQty = currentInvoice.items.reduce((sum, item) => sum + (parseFloat(item.qty) || 0), 0);
+    currentInvoice.material.delivered = totalItemQty;
+    document.getElementById('mat-delivered').value = totalItemQty;
+    renderInvoiceSheet();
+    showToast(`Synced delivered casting: ${totalItemQty} Kg`, 'toast-info');
+  });
+
+  // Calculate 5% burning loss button
+  document.getElementById('btn-calc-5percent-loss').addEventListener('click', () => {
+    const delivered = parseFloat(currentInvoice.material.delivered) || 0;
+    const loss5 = Number((delivered * 0.05).toFixed(3));
+    currentInvoice.material.loss = loss5;
+    document.getElementById('mat-loss').value = loss5;
+    renderInvoiceSheet();
+    showToast(`Calculated 5% melting loss: ${loss5} Kg`, 'toast-info');
+  });
+
+  // Stamp & Sign Listeners
+  document.getElementById('toggle-stamp').addEventListener('change', (e) => {
+    currentInvoice.stamp.show = e.target.checked;
+    renderInvoiceSheet();
+  });
+  document.getElementById('stamp-color').addEventListener('change', (e) => {
+    currentInvoice.stamp.color = e.target.value;
+    renderInvoiceSheet();
+  });
+  document.getElementById('stamp-rotation').addEventListener('input', (e) => {
+    currentInvoice.stamp.rotation = parseInt(e.target.value, 10);
+    renderInvoiceSheet();
+  });
+  document.getElementById('toggle-signature').addEventListener('change', (e) => {
+    currentInvoice.signature.show = e.target.checked;
+    renderInvoiceSheet();
+  });
+  document.getElementById('signatory-label').addEventListener('input', (e) => {
+    currentInvoice.signature.caption = e.target.value;
+    renderInvoiceSheet();
+  });
+
+  // Toggle seller info card expansion
+  document.getElementById('toggle-seller-info').addEventListener('click', () => {
+    const card = document.getElementById('seller-info-card');
+    card.classList.toggle('collapsed-group');
+  });
+
+  // Header Actions
+  document.getElementById('btn-load-sample').addEventListener('click', () => {
+    currentInvoice = JSON.parse(JSON.stringify(ORIGINAL_BILL_DATA));
+    populateEditorFields();
+    renderInvoiceSheet();
+    showToast('Loaded original S K ENTERPRISES bill (Invoice #001)', 'toast-success');
+  });
+
+  document.getElementById('btn-new-bill').addEventListener('click', () => {
+    // Generate next invoice number
+    let nextNum = '002';
+    const currentNum = parseInt(currentInvoice.invoiceNumber, 10);
+    if (!isNaN(currentNum)) {
+      nextNum = String(currentNum + 1).padStart(3, '0');
+    }
+
+    currentInvoice.invoiceNumber = nextNum;
+    currentInvoice.invoiceDate = new Date().toISOString().split('T')[0];
+    populateEditorFields();
+    renderInvoiceSheet();
+    showToast(`Ready for New Bill #${nextNum}`, 'toast-success');
+  });
+
+  document.getElementById('btn-save-bill').addEventListener('click', () => {
     saveCurrentInvoice();
   });
 
-  btnOpen?.addEventListener('click', () => {
-    renderSavedList();
-    if (modal) modal.showModal();
+  document.getElementById('btn-history').addEventListener('click', () => {
+    updateSavedInvoicesModal();
+    document.getElementById('modal-saved-invoices').showModal();
   });
 
-  const closeModal = () => modal && modal.close();
-  btnClose1?.addEventListener('click', closeModal);
-  btnClose2?.addEventListener('click', closeModal);
+  document.getElementById('btn-buyer-directory').addEventListener('click', () => {
+    updateBuyerDirectoryModal();
+    document.getElementById('modal-buyer-directory').showModal();
+  });
+
+  document.getElementById('btn-add-new-buyer-dialog').addEventListener('click', () => {
+    document.getElementById('modal-buyer-directory').close();
+    // Switch to buyer tab
+    document.querySelector('.tab-btn[data-tab="tab-buyer"]').click();
+    document.getElementById('buyer-name').focus();
+    showToast('Enter new buyer details in the editor tab.', 'toast-info');
+  });
+
+  // Modal Closers
+  document.getElementById('btn-close-saved-modal').addEventListener('click', () => {
+    document.getElementById('modal-saved-invoices').close();
+  });
+  document.getElementById('btn-close-saved-modal-2').addEventListener('click', () => {
+    document.getElementById('modal-saved-invoices').close();
+  });
+  document.getElementById('btn-close-buyer-modal').addEventListener('click', () => {
+    document.getElementById('modal-buyer-directory').close();
+  });
+  document.getElementById('btn-close-buyer-modal-2').addEventListener('click', () => {
+    document.getElementById('modal-buyer-directory').close();
+  });
+
+  // Search in Saved Invoices Modal
+  document.getElementById('input-search-saved').addEventListener('input', (e) => {
+    updateSavedInvoicesModal(e.target.value);
+  });
+
+  // Print buttons
+  document.getElementById('btn-print').addEventListener('click', () => {
+    window.print();
+  });
+  document.getElementById('btn-quick-print').addEventListener('click', () => {
+    window.print();
+  });
+
+  // Zoom controls
+  let currentZoom = 1;
+  const sheet = document.getElementById('invoice-sheet');
+  const zoomDisplay = document.getElementById('zoom-value');
+
+  document.getElementById('btn-zoom-in').addEventListener('click', () => {
+    if (currentZoom < 1.4) {
+      currentZoom += 0.1;
+      sheet.style.transform = `scale(${currentZoom})`;
+      zoomDisplay.textContent = Math.round(currentZoom * 100) + '%';
+    }
+  });
+
+  document.getElementById('btn-zoom-out').addEventListener('click', () => {
+    if (currentZoom > 0.5) {
+      currentZoom -= 0.1;
+      sheet.style.transform = `scale(${currentZoom})`;
+      zoomDisplay.textContent = Math.round(currentZoom * 100) + '%';
+    }
+  });
+
+  document.getElementById('btn-zoom-reset').addEventListener('click', () => {
+    currentZoom = 1;
+    sheet.style.transform = 'scale(1)';
+    zoomDisplay.textContent = '100%';
+  });
+
+  // Theme Toggle (Dark/Light workspace)
+  document.getElementById('btn-theme-toggle').addEventListener('click', () => {
+    const isDark = document.body.classList.toggle('theme-dark');
+    document.getElementById('theme-icon').textContent = isDark ? '☀️' : '🌙';
+    localStorage.setItem('sk_theme', isDark ? 'dark' : 'light');
+  });
 
   // Export JSON
-  document.getElementById('btn-export-all-json')?.addEventListener('click', () => {
-    const saved = getSavedInvoices();
-    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(saved, null, 2));
-    const dlAnchor = document.createElement('a');
-    dlAnchor.setAttribute('href', dataStr);
-    dlAnchor.setAttribute('download', `ApexBill_Invoices_Backup_${new Date().toISOString().split('T')[0]}.json`);
-    dlAnchor.click();
-    showToast('Invoices backup exported successfully', 'success');
+  document.getElementById('btn-export-all-json').addEventListener('click', () => {
+    const data = {
+      seller: FIXED_SELLER,
+      invoices: getSavedInvoices(),
+      buyers: getSavedBuyers(),
+      exportedAt: new Date().toISOString()
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `sk-enterprises-invoices-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('Invoices backup exported as JSON', 'toast-success');
   });
 
   // Import JSON
-  document.getElementById('input-import-json')?.addEventListener('change', (e) => {
+  document.getElementById('input-import-json').addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (file) {
       const reader = new FileReader();
       reader.onload = (event) => {
         try {
           const imported = JSON.parse(event.target.result);
-          if (Array.isArray(imported)) {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(imported));
-            updateSavedInvoicesCount();
-            renderSavedList();
-            showToast(`Imported ${imported.length} invoices!`, 'success');
-          } else {
-            showToast('Invalid backup file format.', 'danger');
+          if (imported.invoices && Array.isArray(imported.invoices)) {
+            localStorage.setItem('sk_saved_invoices', JSON.stringify(imported.invoices));
           }
+          if (imported.buyers && Array.isArray(imported.buyers)) {
+            localStorage.setItem('sk_saved_buyers', JSON.stringify(imported.buyers));
+          }
+          populateSavedBuyerDropdown();
+          updateSavedInvoiceCount();
+          updateSavedInvoicesModal();
+          showToast('Invoices backup imported successfully!', 'toast-success');
         } catch (err) {
-          showToast('Failed to parse backup file.', 'danger');
+          showToast('Failed to parse backup JSON file.', 'toast-error');
         }
       };
       reader.readAsText(file);
@@ -1381,174 +1435,32 @@ function setupSavedInvoicesManager() {
   });
 }
 
-function getSavedInvoices() {
-  try {
-    const data = localStorage.getItem(STORAGE_KEY);
-    return data ? JSON.parse(data) : [];
-  } catch (e) {
-    return [];
-  }
-}
-
-function saveCurrentInvoice() {
-  const saved = getSavedInvoices();
-  const existingIdx = saved.findIndex(item => item.invoiceNumber === invoiceState.invoiceNumber);
-
-  const snapshot = {
-    ...invoiceState,
-    savedAt: new Date().toLocaleString()
-  };
-
-  if (existingIdx >= 0) {
-    saved[existingIdx] = snapshot;
-  } else {
-    saved.unshift(snapshot);
-  }
-
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
-  updateSavedInvoicesCount();
-  showToast(`Invoice ${invoiceState.invoiceNumber} saved!`, 'success');
-}
-
-function updateSavedInvoicesCount() {
-  const countEl = document.getElementById('saved-count');
-  if (countEl) {
-    countEl.textContent = getSavedInvoices().length;
-  }
-}
-
-function renderSavedList() {
-  const container = document.getElementById('saved-invoices-list');
-  if (!container) return;
-  const list = getSavedInvoices();
-
-  if (list.length === 0) {
-    container.innerHTML = '<p class="text-muted text-center py-4">No saved invoices found. Save an invoice first!</p>';
-    return;
-  }
-
-  container.innerHTML = '';
-  list.forEach(inv => {
-    const itemDiv = document.createElement('div');
-    itemDiv.className = 'saved-invoice-item';
-    itemDiv.innerHTML = `
-      <div>
-        <div class="saved-info-title">${escapeHTML(inv.invoiceNumber)} - ${escapeHTML(inv.buyer?.name || 'Customer')}</div>
-        <div class="saved-info-meta">Date: ${escapeHTML(inv.invoiceDate)} | Saved: ${escapeHTML(inv.savedAt || '')}</div>
-      </div>
-      <div class="saved-actions">
-        <button type="button" class="btn btn-sm btn-primary btn-load-inv" data-num="${escapeHTML(inv.invoiceNumber)}">Load</button>
-        <button type="button" class="btn btn-sm btn-ghost text-danger btn-del-inv" data-num="${escapeHTML(inv.invoiceNumber)}">Delete</button>
-      </div>
-    `;
-
-    itemDiv.querySelector('.btn-load-inv').addEventListener('click', () => {
-      loadSavedInvoice(inv.invoiceNumber);
-      document.getElementById('modal-saved-invoices')?.close();
-    });
-
-    itemDiv.querySelector('.btn-del-inv').addEventListener('click', () => {
-      deleteSavedInvoice(inv.invoiceNumber);
-    });
-
-    container.appendChild(itemDiv);
-  });
-}
-
-function loadSavedInvoice(invNum) {
-  const saved = getSavedInvoices();
-  const found = saved.find(it => it.invoiceNumber === invNum);
-  if (found) {
-    invoiceState = JSON.parse(JSON.stringify(found));
-    syncStateToInputs();
-    calculateAndRender();
-    showToast(`Loaded invoice ${invNum}`, 'info');
-  }
-}
-
-function deleteSavedInvoice(invNum) {
-  let saved = getSavedInvoices();
-  saved = saved.filter(it => it.invoiceNumber !== invNum);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
-  updateSavedInvoicesCount();
-  renderSavedList();
-  showToast(`Deleted invoice ${invNum}`, 'info');
-}
-
-function createNewBlankInvoice() {
-  const randNum = Math.floor(1000 + Math.random() * 9000);
-  invoiceState.invoiceNumber = `INV-${new Date().getFullYear()}-${randNum}`;
-  invoiceState.items = [
-    {
-      id: 'item-' + Date.now(),
-      description: 'Consulting & Development Services',
-      hsn: '998314',
-      qty: 1,
-      unit: 'Hours',
-      rate: 2500,
-      discount: 0,
-      taxRate: 18
-    }
-  ];
-  invoiceState.overallDiscount = 0;
-  invoiceState.shippingCharges = 0;
-  syncStateToInputs();
-  if (sigPadController) sigPadController.clear();
-  calculateAndRender();
-  showToast('New blank invoice created', 'info');
-}
-
 // =============================================================================
-// 11. Theme & Helpers
+// 12. Application Initialization
 // =============================================================================
-function toggleTheme() {
-  const body = document.body;
-  const isDark = body.classList.contains('theme-dark');
-  const icon = document.getElementById('theme-icon');
-  if (isDark) {
-    body.classList.remove('theme-dark');
-    body.classList.add('theme-light');
-    if (icon) icon.textContent = '🌙';
-  } else {
-    body.classList.remove('theme-light');
-    body.classList.add('theme-dark');
+document.addEventListener('DOMContentLoaded', () => {
+  // Restore saved theme
+  const savedTheme = localStorage.getItem('sk_theme');
+  if (savedTheme === 'dark') {
+    document.body.classList.add('theme-dark');
+    const icon = document.getElementById('theme-icon');
     if (icon) icon.textContent = '☀️';
   }
-}
 
-function showToast(msg, type = 'info') {
-  const container = document.getElementById('toast-container');
-  if (!container) return;
-  const toast = document.createElement('div');
-  toast.className = `toast toast-${type}`;
-  toast.innerHTML = `<span>${escapeHTML(msg)}</span>`;
-  container.appendChild(toast);
-  setTimeout(() => {
-    toast.style.opacity = '0';
-    toast.style.transform = 'translateY(10px)';
-    toast.style.transition = 'all 0.25s ease';
-    setTimeout(() => toast.remove(), 250);
-  }, 2800);
-}
-
-function formatDateDisplay(dateStr) {
-  if (!dateStr) return '-';
-  const parts = dateStr.split('-');
-  if (parts.length === 3) {
-    return `${parts[2]}-${parts[1]}-${parts[0]}`;
+  // Initialize Buyer Directory default if empty
+  if (!localStorage.getItem('sk_saved_buyers')) {
+    localStorage.setItem('sk_saved_buyers', JSON.stringify(DEFAULT_BUYERS));
   }
-  return dateStr;
-}
 
-function escapeHTML(str) {
-  if (!str) return '';
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
+  // Initialize Canvas
+  initSignaturePad();
 
-// Start Application on DOM Ready
-document.addEventListener('DOMContentLoaded', initApp);
+  // Populate editor with initial bill state and render sheet
+  populateEditorFields();
+  renderInvoiceSheet();
+
+  // Attach all user interactions
+  setupEventListeners();
+
+  console.log('S K ENTERPRISES Billing Software successfully initialized.');
+});

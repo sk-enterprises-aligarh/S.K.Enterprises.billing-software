@@ -1,53 +1,83 @@
-# ApexBill Pro - Smart GST Commercial Billing & Invoicing Software
+# S K ENTERPRISES - GST Tax Invoice & Job Work Billing Software
 
-ApexBill Pro is a modern, responsive, and commercial-grade GST billing web application designed for small-to-medium businesses, freelancers, and enterprises. It provides real-time tax calculations, company logo placement, buyer and supplier management, digital rubber stamps, signature capture, and pixel-perfect A4 printing/PDF export.
+Custom-designed commercial billing software tailored specifically for **S K ENTERPRISES** (Aligarh, Uttar Pradesh).
 
-![ApexBill Pro Banner](logo-placeholder.svg)
-
----
-
-## 🌟 Features
-
-- **Company Logo (Top Middle Space)**: Prominently centered space for your company logo with height and alignment adjustments.
-- **Supplier & Consignor Details**: Business name, 15-digit GSTIN (with auto format validation), PAN, phone, email, address, state & state code.
-- **Buyer & Consignee Details**: Customer name, GSTIN, contact info, billing address, and optional separate shipping address.
-- **Dynamic Line Items**: Add, edit, or remove products and services with HSN/SAC code, quantity, unit, unit rate, discount %, and GST slab rates (0%, 5%, 12%, 18%, 28%).
-- **Dual GST Modes**:
-  - **Inter-State**: Single IGST calculation.
-  - **Intra-State**: 50/50 split CGST and SGST calculation.
-- **Total Amount in Words**: Real-time conversion into Indian numbering format (*Lakhs, Crores, Thousands, Hundreds, Rupees & Paise*) and international currency formats.
-- **Seller Signature & Digital Stamp**:
-  - **Interactive Signature Canvas**: Draw signatures using mouse, stylus, or touch screen, or upload a signature image.
-  - **Official Rubber Stamp**: Dynamic circular rubber stamp with customizable business name, ink colors (Ruby Red, Navy Blue, Royal Purple, Forest Green), tilt angle, or custom PNG stamp upload.
-- **Instant UPI QR Code**: Automatically generated dynamic UPI payment QR code on the invoice for instant scan-and-pay.
-- **Bank & Remittance Details**: Bank name, account number, IFSC code, branch, and UPI ID.
-- **Terms & Notes**: Editable terms of sale and customer notes.
-- **Standard A4 Print & PDF**: Immaculate `@media print` styling that hides app controls and produces a clean, high-contrast A4 commercial tax invoice.
-- **Save & Load History**: Store multiple invoices locally with JSON backup export and import.
-- **Theme Support**: Seamless toggle between sleek Dark Mode and clean Light Mode.
+The software permanently locks the seller/owner configuration to **S K ENTERPRISES** while providing a dynamic, feature-rich interface to create, edit, save, and print GST Job Work Tax Invoices for any buyer/customer.
 
 ---
 
-## 🚀 Quick Start
+## 🌟 Key Features
 
-ApexBill Pro runs directly in any modern web browser without heavy server dependencies.
+### 🔒 Permanently Locked Seller & Owner (Non-Editable)
+As per configuration, the billing entity is fixed and cannot be accidentally modified:
+- **Firm Name**: `S K ENTERPRISES`
+- **Address**: `AGRAWAL STREET, SHAKTI NAGAR, GULAR ROAD, ALIGARH 202001 (UP) - INDIA`
+- **Mobile No.**: `93595 02004`
+- **GSTIN**: `09AVQPG8947B1Z6`
+- **State Code**: `09` (Uttar Pradesh)
+- **Bank Details**: `CANARA BANK`, SME BRANCH, GULAR ROAD, ALIGARH
+- **Account No.**: `120002136484` | **IFSC**: `CNRB0002375`
+- **Signatory**: `FOR S K ENTERPRISES` / `Partner/ Authorised Signatory`
+- **Jurisdiction**: `All Disputes are Subject to Aligarh Jurisdiction`
 
-### 1. Clone the repository
+### 👤 Fully Editable Buyer Details ("Billed To:")
+- **Buyer Name / Company**: Full name editing (e.g. `M/s SREE CORPORATION`).
+- **Address**: Multi-line address (Address Line 1, Address Line 2, City & Pincode).
+- **GSTIN & State Detection**: Auto-validates 15-character GSTIN and automatically detects State Code (e.g. `09` -> Uttar Pradesh).
+- **Saved Buyer Directory**: Save frequent buyers to local database for 1-click loading.
+
+### 📦 Consignment Specifications
+- Transport By, L.R. No., Vehicle Number, E-Way Bill Number.
+- Place of Supply, Number of Cases (e.g. `35 BAGS`), Reverse Charge (Yes/No).
+- Weight (Kg) and Freight (Rs.).
+
+### ⚙️ Line Items & GST Calculations
+- Dynamic particulars table with fast presets for:
+  - `ZINC DIE CASTING CHARGES` (HSN 9988)
+  - `ALUMINIUM DIE CASTING CHARGES` (HSN 9988)
+  - `ZINC JOB WORK CHARGES` (HSN 9988)
+  - `FINISHING & BUFFING CHARGES` (HSN 9988)
+- Real-time tax calculation:
+  - **Intra-State (UP)**: 9% SGST + 9% CGST (18% Total GST)
+  - **Inter-State (Outside UP)**: 18% IGST (auto-detected when Buyer State Code ≠ 09)
+- Auto round off to nearest whole rupee.
+- Real-time Indian currency Number-to-Words converter (*Lakhs, Thousands, Hundreds, Rupees & Paise*).
+
+### ⚖️ Details of Material (Zinc Job Work Material Ledger)
+Direct accounting of raw material issued by the customer and casting returned:
+- Date of Material Ledger (e.g. `02-07-2022`)
+- Opening Balance (Kg)
+- Zinc Raw Material Received (Kg)
+- Total Available (Opening + Received)
+- Casting Delivered (Kg) with 1-click "Sync Qty" from bill
+- Burning / Melting Loss (Kg) with 1-click "5% Loss" calculator
+- Zinc Returned (Kg)
+- Auto-calculated Zinc Balance with the caster
+
+### 🖨️ Pixel-Perfect Standard A4 Print & PDF
+- Exact replica of the original physical tax invoice with crisp black borders and high-contrast typography.
+- Built-in `@media print` engine that formats flawlessly on standard A4 paper without cutting off tables or page elements.
+
+### 💾 Local Database & Backup
+- **Save Bill**: Persist invoices in browser local storage.
+- **Invoice History**: Search, preview, and reload any past invoice.
+- **Export & Import**: Full JSON backup and restore functionality.
+
+---
+
+## 🚀 How to Run Locally
+
+You can run the application directly using Python's built-in HTTP server:
+
 ```bash
-git clone https://github.com/Namansinghal800/billing-software.git
 cd billing-software
+python -m http.server 8088
 ```
 
-### 2. Run Locally
+Open your browser and navigate to:
+👉 **http://localhost:8088**
 
-You can open `index.html` directly in your browser, or serve it using Python's built-in HTTP server:
-
-```bash
-python -m http.server 8080
-```
-
-Now open:
-👉 **http://localhost:8080**
+Or open `index.html` directly in Google Chrome, Microsoft Edge, or Firefox.
 
 ---
 
@@ -55,16 +85,9 @@ Now open:
 
 ```
 billing-software/
-├── index.html              # Main application markup & A4 invoice template
-├── style.css               # Modern design system, dual-pane UI & print styles
-├── app.js                  # Reactive calculations, number-to-words, canvas signature
-├── logo-placeholder.svg    # Default vector company logo
-├── stamp-default.svg       # Default circular rubber stamp asset
-└── README.md               # Documentation
+├── index.html       # Application interface & A4 Tax Invoice template
+├── style.css        # Modern design system & pixel-perfect print styles
+├── app.js           # Calculation engine, Indian words converter & state manager
+├── stamp-sk.svg     # Official S K Enterprises rubber stamp vector
+└── README.md        # Documentation
 ```
-
----
-
-## 📄 License
-
-This project is licensed under the MIT License.

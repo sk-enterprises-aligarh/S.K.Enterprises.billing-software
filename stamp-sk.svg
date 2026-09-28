@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <defs>
+    <path id="circleTextPathOuterSK" d="M 100, 100 m -70, 0 a 70,70 0 1,1 140,0 a 70,70 0 1,1 -140,0" />
+    <path id="circleTextPathInnerSK" d="M 100, 100 m -52, 0 a 52,52 0 1,1 104,0 a 52,52 0 1,1 -104,0" />
+  </defs>
+
+  <g transform="rotate(-7 100 100)" opacity="0.88">
+    <!-- Double Circular Rings -->
+    <circle cx="100" cy="100" r="92" fill="none" stroke="#1d4ed8" stroke-width="3" stroke-dasharray="900" stroke-linecap="round" />
+    <circle cx="100" cy="100" r="84" fill="none" stroke="#1d4ed8" stroke-width="1.5" />
+    <circle cx="100" cy="100" r="60" fill="none" stroke="#1d4ed8" stroke-width="1.6" />
+    <circle cx="100" cy="100" r="56" fill="none" stroke="#1d4ed8" stroke-width="1" />
+
+    <!-- Circular Curved Text -->
+    <text font-family="'Inter', Arial, sans-serif" font-size="11.5" font-weight="900" fill="#1d4ed8" letter-spacing="2.8">
+      <textPath href="#circleTextPathOuterSK" startOffset="50%" text-anchor="middle">
+        ★ S K ENTERPRISES ★ ALIGARH ★
+      </textPath>
+    </text>
+
+    <!-- Center Box & Details -->
+    <rect x="22" y="83" width="156" height="34" rx="4" fill="#dbeafe" fill-opacity="0.5" stroke="#1d4ed8" stroke-width="1.5" />
+    <text x="100" y="98" font-family="'Inter', Arial, sans-serif" font-size="11.5" font-weight="900" fill="#1d4ed8" text-anchor="middle" letter-spacing="1.5">
+      PARTNER / AUTH. SIGN.
+    </text>
+    <text x="100" y="110" font-family="'Inter', Arial, sans-serif" font-size="8.5" font-weight="800" fill="#1e40af" text-anchor="middle" letter-spacing="0.8">
+      JOB WORK DIE CASTING
+    </text>
+
+    <text x="100" y="74" font-family="'Inter', Arial, sans-serif" font-size="8" font-weight="700" fill="#1e40af" text-anchor="middle" letter-spacing="1">
+      GST: 09AVQPG8947B1Z6
+    </text>
+
+    <text x="100" y="132" font-family="'Inter', Arial, sans-serif" font-size="8.5" font-weight="700" fill="#1e40af" text-anchor="middle" letter-spacing="1">
+      ALIGARH - 202001 (U.P.)
+    </text>
+  </g>
+</svg>
