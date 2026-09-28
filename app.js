@@ -859,6 +859,7 @@ function updateSavedInvoicesModal(query = '') {
       </div>
       <div class="saved-item-actions">
         <button type="button" class="btn btn-sm btn-primary btn-load-saved-inv" data-id="${inv.id}">Open</button>
+        <button type="button" class="btn btn-sm btn-outline btn-download-single-pdf" data-id="${inv.id}" title="Download this invoice as a PDF file">PDF</button>
         <button type="button" class="btn btn-sm btn-ghost text-danger btn-del-saved-inv" data-id="${inv.id}">Delete</button>
       </div>
     `;
@@ -879,6 +880,16 @@ function updateSavedInvoicesModal(query = '') {
     });
   });
 
+  listEl.querySelectorAll('.btn-download-single-pdf').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const id = e.target.dataset.id;
+      const target = invoices.find(i => i.id === id);
+      if (target) {
+        exportSingleInvoiceToPdf(target.data, target.invoiceNumber, target.buyerName);
+      }
+    });
+  });
+
   listEl.querySelectorAll('.btn-del-saved-inv').forEach(btn => {
     btn.addEventListener('click', (e) => {
       const id = e.target.dataset.id;
@@ -889,6 +900,203 @@ function updateSavedInvoicesModal(query = '') {
       showToast('Invoice removed from database.', 'toast-info');
     });
   });
+}
+
+// =============================================================================
+// 8b. PDF & ZIP Export Functions (html2pdf + JSZip)
+// =============================================================================
+
+async function exportSingleInvoiceToPdf(invoiceData, invoiceNum, buyerName) {
+  if (typeof html2pdf === 'undefined') {
+    showToast('PDF engine is loading. Please try again.', 'toast-error');
+    return;
+  }
+
+  const backupInvoice = JSON.parse(JSON.stringify(currentInvoice));
+  const sheet = document.getElementById('invoice-sheet');
+  const originalTransform = sheet.style.transform;
+  sheet.style.transform = 'scale(1)';
+
+  showToast(`Generating PDF for Invoice #${invoiceNum}...`, 'toast-info');
+
+  try {
+    currentInvoice = JSON.parse(JSON.stringify(invoiceData || currentInvoice));
+    renderInvoiceSheet();
+    await new Promise(resolve => setTimeout(resolve, 80));
+
+    const safeBuyer = (buyerName || 'Buyer').replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '_');
+    const filename = `Invoice_${invoiceNum || '001'}_${safeBuyer}.pdf`;
+
+    const opt = {
+      margin: [0, 0, 0, 0],
+      filename: filename,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: {
+        scale: 2,
+        useCORS: true,
+        letterRendering: true,
+        scrollY: 0,
+        scrollX: 0
+      },
+      jsPDF: {
+        unit: 'mm',
+        format: 'a4',
+        orientation: 'portrait'
+      }
+    };
+
+    await html2pdf().set(opt).from(sheet).save();
+    showToast(`Downloaded ${filename}`, 'toast-success');
+  } catch (err) {
+    console.error('Error generating single PDF:', err);
+    showToast('Failed to generate PDF.', 'toast-error');
+  } finally {
+    currentInvoice = backupInvoice;
+    populateEditorFields();
+    renderInvoiceSheet();
+    sheet.style.transform = originalTransform;
+  }
+}
+
+async function exportAllInvoicesToZip() {
+  if (typeof JSZip === 'undefined' || typeof html2pdf === 'undefined') {
+    showToast('Export libraries are loading. Please try again.', 'toast-error');
+    return;
+  }
+
+  let invoices = getSavedInvoices();
+
+  // If no saved invoices in history, export the currently open bill
+  if (!invoices || invoices.length === 0) {
+    const totals = calculateBillTotals();
+    invoices = [{
+      id: currentInvoice.invoiceNumber || '001',
+      invoiceNumber: currentInvoice.invoiceNumber || '001',
+      invoiceDate: currentInvoice.invoiceDate,
+      buyerName: currentInvoice.buyer.name || 'M/s SREE CORPORATION',
+      grandTotal: totals.grandTotal,
+      data: JSON.parse(JSON.stringify(currentInvoice))
+    }];
+  }
+
+  // Close the saved invoices modal if open so progress modal is clear
+  const savedModal = document.getElementById('modal-saved-invoices');
+  if (savedModal && savedModal.open) {
+    savedModal.close();
+  }
+
+  const progressModal = document.getElementById('modal-export-progress');
+  const progressTitle = document.getElementById('export-progress-title');
+  const progressDetail = document.getElementById('export-progress-detail');
+  const progressBar = document.getElementById('export-progress-bar');
+  const progressPercent = document.getElementById('export-progress-percent');
+  const progressFooter = document.getElementById('export-progress-footer');
+  const spinnerWrapper = document.querySelector('.export-spinner-wrapper');
+
+  progressFooter.style.display = 'none';
+  spinnerWrapper.style.display = 'block';
+  progressBar.style.width = '0%';
+  progressPercent.textContent = '0%';
+  progressTitle.textContent = `Preparing ${invoices.length} Bill${invoices.length > 1 ? 's' : ''} for Export...`;
+  progressDetail.textContent = 'Initializing PDF conversion engine...';
+  progressModal.showModal();
+
+  // Backup current UI state
+  const backupInvoice = JSON.parse(JSON.stringify(currentInvoice));
+  const sheet = document.getElementById('invoice-sheet');
+  const originalTransform = sheet.style.transform;
+  sheet.style.transform = 'scale(1)';
+
+  const zip = new JSZip();
+  const folder = zip.folder("SK_Enterprises_Tax_Invoices");
+
+  try {
+    for (let i = 0; i < invoices.length; i++) {
+      const inv = invoices[i];
+      const invNum = inv.invoiceNumber || inv.id || String(i + 1);
+      const buyerName = (inv.buyerName || 'Buyer').replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '_');
+      const filename = `Invoice_${invNum}_${buyerName}.pdf`;
+
+      const pct = Math.round((i / invoices.length) * 90);
+      progressBar.style.width = `${pct}%`;
+      progressPercent.textContent = `${pct}%`;
+      progressTitle.textContent = `Converting Bill ${i + 1} of ${invoices.length}`;
+      progressDetail.textContent = `Generating PDF: Invoice #${invNum} (${inv.buyerName || 'Customer'})...`;
+
+      // Render this invoice into the live sheet
+      currentInvoice = JSON.parse(JSON.stringify(inv.data || inv));
+      renderInvoiceSheet();
+
+      // Delay to ensure DOM repaint and clean layout
+      await new Promise(resolve => setTimeout(resolve, 80));
+
+      const opt = {
+        margin: [0, 0, 0, 0],
+        filename: filename,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          letterRendering: true,
+          scrollY: 0,
+          scrollX: 0
+        },
+        jsPDF: {
+          unit: 'mm',
+          format: 'a4',
+          orientation: 'portrait'
+        }
+      };
+
+      const pdfBlob = await html2pdf().set(opt).from(sheet).outputPdf('blob');
+      folder.file(filename, pdfBlob);
+    }
+
+    // Packing ZIP
+    progressBar.style.width = '95%';
+    progressPercent.textContent = '95%';
+    progressTitle.textContent = 'Compressing into ZIP archive...';
+    progressDetail.textContent = `Bundling ${invoices.length} PDF bills into ZIP file...`;
+
+    const zipBlob = await zip.generateAsync({
+      type: 'blob',
+      compression: 'DEFLATE',
+      compressionOptions: { level: 6 }
+    });
+
+    const zipFilename = `SK_Enterprises_Bills_PDFs_${Date.now()}.zip`;
+    const downloadUrl = URL.createObjectURL(zipBlob);
+    const a = document.createElement('a');
+    a.href = downloadUrl;
+    a.download = zipFilename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(downloadUrl);
+
+    // Completion status
+    progressBar.style.width = '100%';
+    progressPercent.textContent = '100%';
+    progressTitle.textContent = 'ZIP Export Complete!';
+    progressDetail.textContent = `Successfully packaged and downloaded ${invoices.length} bill PDF${invoices.length > 1 ? 's' : ''} in ${zipFilename}.`;
+    spinnerWrapper.style.display = 'none';
+    progressFooter.style.display = 'flex';
+
+    showToast(`Exported ${invoices.length} bills as PDF in ZIP!`, 'toast-success');
+  } catch (err) {
+    console.error('Error exporting ZIP of PDFs:', err);
+    progressTitle.textContent = 'Export Failed';
+    progressDetail.textContent = `Error: ${err.message || 'Could not complete PDF export.'}`;
+    spinnerWrapper.style.display = 'none';
+    progressFooter.style.display = 'flex';
+    showToast('Failed to export ZIP file.', 'toast-error');
+  } finally {
+    // Restore UI state
+    currentInvoice = backupInvoice;
+    populateEditorFields();
+    renderInvoiceSheet();
+    sheet.style.transform = originalTransform;
+  }
 }
 
 // =============================================================================
@@ -1389,6 +1597,28 @@ function setupEventListeners() {
     document.getElementById('theme-icon').textContent = isDark ? '☀️' : '🌙';
     localStorage.setItem('sk_theme', isDark ? 'dark' : 'light');
   });
+
+  // Export All as PDFs (ZIP) buttons
+  const btnExportZipTop = document.getElementById('btn-export-zip-top');
+  if (btnExportZipTop) {
+    btnExportZipTop.addEventListener('click', () => {
+      exportAllInvoicesToZip();
+    });
+  }
+
+  const btnExportAllZipPdf = document.getElementById('btn-export-all-zip-pdf');
+  if (btnExportAllZipPdf) {
+    btnExportAllZipPdf.addEventListener('click', () => {
+      exportAllInvoicesToZip();
+    });
+  }
+
+  const btnCloseProgressModal = document.getElementById('btn-close-progress-modal');
+  if (btnCloseProgressModal) {
+    btnCloseProgressModal.addEventListener('click', () => {
+      document.getElementById('modal-export-progress').close();
+    });
+  }
 
   // Export JSON
   document.getElementById('btn-export-all-json').addEventListener('click', () => {

@@ -58,6 +58,13 @@ Direct accounting of raw material issued by the customer and casting returned:
 - Exact replica of the original physical tax invoice with crisp black borders and high-contrast typography.
 - Built-in `@media print` engine that formats flawlessly on standard A4 paper without cutting off tables or page elements.
 
+### 📦 Export All Bills in a ZIP (PDF) File
+- **Bulk PDF Generation**: Automatically converts all saved bills into individual high-resolution A4 PDF files and packages them into a single downloadable `.zip` archive.
+- **Top Bar & History Access**: One-click "Export ZIP (PDFs)" button in the top navigation bar and inside the Invoice History Database modal.
+- **Interactive Progress Dialog**: Shows real-time progress bar, percentage, and the current bill being converted.
+- **Individual PDF Downloads**: Direct "PDF" button on every invoice card in the history list for instant single invoice download.
+- **100% Offline & Client-Side**: Powered by bundled `JSZip` and `html2pdf.js` with zero server dependencies.
+
 ### 💾 Local Database & Backup
 - **Save Bill**: Persist invoices in browser local storage.
 - **Invoice History**: Search, preview, and reload any past invoice.
