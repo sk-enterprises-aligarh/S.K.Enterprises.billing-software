@@ -7,7 +7,7 @@
   <meta name="description" content="Dedicated GST Billing and Job Work Invoicing Software for S K Enterprises, Aligarh. Real-time GST calculation, zinc material ledger, buyer management, and A4 print/PDF.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Dancing+Script:wght@700&family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body class="theme-light">
@@ -435,9 +435,10 @@
             <div class="card-body" id="material-editor-body">
               <p class="field-hint">Track customer zinc raw material received, casting delivered, melting/burning loss, and remaining balance.</p>
 
+              <!-- 1. Opening Balance -->
               <div class="form-row">
                 <div class="form-group flex-1">
-                  <label for="mat-date">Ledger Date</label>
+                  <label for="mat-date">Opening Balance Date</label>
                   <input type="date" id="mat-date" class="form-control" value="2022-07-02">
                 </div>
                 <div class="form-group flex-1">
@@ -446,14 +447,35 @@
                 </div>
               </div>
 
-              <div class="form-row">
-                <div class="form-group flex-1">
-                  <label for="mat-received">Zinc Raw Material Received (Kg.)</label>
-                  <input type="number" step="0.001" id="mat-received" class="form-control font-bold" value="1256.000">
+              <!-- 2. Zinc Raw Material Received Entries (With Add Button & Date for each entry) -->
+              <div class="mat-received-section">
+                <div class="mat-received-header">
+                  <div class="mat-received-title-wrap">
+                    <span class="mat-section-title">ZINC RAW MATERIAL RECEIVED</span>
+                    <span class="badge-count" id="mat-rec-count-badge">1 Entry</span>
+                  </div>
+                  <button type="button" id="btn-add-mat-received" class="btn btn-sm btn-primary">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    + Add Received Entry
+                  </button>
                 </div>
+                <p class="field-hint" style="margin-top:2px; margin-bottom:8px;">Add each raw zinc lot with date and weight in Kg received from the customer.</p>
+
+                <!-- List of Dynamic Received Entries -->
+                <div id="mat-received-entries-container" class="mat-received-container">
+                  <!-- Rendered dynamically by app.js -->
+                </div>
+
+                <div class="mat-received-total-strip">
+                  <span>Total Zinc Received:</span>
+                  <strong id="mat-received-total-strip-val">1256.000 Kg</strong>
+                </div>
+              </div>
+
+              <div class="form-row mt-2">
                 <div class="form-group flex-1">
-                  <label for="mat-total">Total Material Available (Kg.)</label>
-                  <input type="number" step="0.001" id="mat-total" class="form-control bg-readonly" value="1256.000" readonly>
+                  <label for="mat-total">Total Material Available (Kg.) [Opening + Received]</label>
+                  <input type="number" step="0.001" id="mat-total" class="form-control bg-readonly font-bold" value="1256.000" readonly>
                 </div>
               </div>
 
@@ -548,21 +570,54 @@
                 </div>
 
                 <div id="signature-controls-area">
-                  <div class="signature-canvas-container">
-                    <canvas id="signature-pad" width="340" height="120"></canvas>
-                    <div class="signature-hint-watermark" id="signature-hint">Draw Partner Signature Here</div>
+                  <!-- Mode Switcher: Draw, Type, Upload, Preset -->
+                  <div class="sig-mode-tabs">
+                    <button type="button" class="btn-sig-mode active" data-sig-mode="draw">✏️ Draw Sign</button>
+                    <button type="button" class="btn-sig-mode" data-sig-mode="type">⌨️ Type Name</button>
+                    <button type="button" class="btn-sig-mode" data-sig-mode="upload">📁 Upload File</button>
+                    <button type="button" class="btn-sig-mode" id="btn-sig-preset">⚡ S.K. Preset</button>
                   </div>
 
-                  <div class="sig-action-bar">
-                    <button type="button" id="btn-clear-sig" class="btn btn-sm btn-outline">Clear Canvas</button>
-                    <div class="sig-pen-colors">
-                      <span class="pen-dot active" data-color="#1e293b" style="background:#1e293b;" title="Black Ink"></span>
-                      <span class="pen-dot" data-color="#1d4ed8" style="background:#1d4ed8;" title="Blue Ink"></span>
+                  <!-- 1. Draw Canvas Mode -->
+                  <div id="sig-mode-draw-panel" class="sig-panel active">
+                    <div class="signature-canvas-container">
+                      <canvas id="signature-pad" width="600" height="200"></canvas>
+                      <div class="signature-hint-watermark" id="signature-hint">Draw Partner Signature Here (Mouse, Touch or Pen)</div>
                     </div>
-                    <label for="input-sig-file" class="btn btn-sm btn-ghost" title="Upload signature image">
-                      Upload Sign Image
-                    </label>
-                    <input type="file" id="input-sig-file" accept="image/*" style="display:none;">
+                    <div class="sig-action-bar">
+                      <button type="button" id="btn-clear-sig" class="btn btn-sm btn-outline">Clear Canvas</button>
+                      <div class="sig-pen-colors">
+                        <span class="pen-dot active" data-color="#1d4ed8" style="background:#1d4ed8;" title="Navy Blue Ink"></span>
+                        <span class="pen-dot" data-color="#0f172a" style="background:#0f172a;" title="Black Ink"></span>
+                        <span class="pen-dot" data-color="#7c3aed" style="background:#7c3aed;" title="Purple Ink"></span>
+                      </div>
+                      <span class="sig-status-badge" id="sig-status-badge">Ready to draw</span>
+                    </div>
+                  </div>
+
+                  <!-- 2. Type Name Mode -->
+                  <div id="sig-mode-type-panel" class="sig-panel" style="display:none;">
+                    <div class="form-group">
+                      <label for="input-type-sign">Partner / Signatory Name</label>
+                      <input type="text" id="input-type-sign" class="form-control" placeholder="e.g. Sunil Kumar or S.K. Enterprises" value="S. K. Enterprises">
+                    </div>
+                    <div class="type-sign-preview-box">
+                      <div id="type-sign-preview-text" class="typed-signature-display">S. K. Enterprises</div>
+                    </div>
+                    <button type="button" id="btn-apply-typed-sign" class="btn btn-sm btn-primary mt-2">
+                      Apply Typed Signature to Bill
+                    </button>
+                  </div>
+
+                  <!-- 3. Upload File Mode -->
+                  <div id="sig-mode-upload-panel" class="sig-panel" style="display:none;">
+                    <div class="upload-sign-dropzone" id="upload-dropzone">
+                      <input type="file" id="input-sig-file" accept="image/*" style="display:none;">
+                      <label for="input-sig-file" class="upload-dropzone-label">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                        <span>Click to browse signature image (PNG, JPG, SVG)</span>
+                      </label>
+                    </div>
                   </div>
 
                   <div class="form-row mt-2">
@@ -836,9 +891,12 @@
                   <div class="mat-label"><span id="view-mat-date">02-07-2022</span> OPENING BALANCE</div>
                   <div class="mat-val" id="view-mat-opening">0.000</div>
                 </div>
-                <div class="mat-row">
-                  <div class="mat-label">ZINC RAW MATERIAL RECEIVED</div>
-                  <div class="mat-val" id="view-mat-received">1256.000</div>
+                <!-- Dynamic Received Rows inserted here -->
+                <div id="view-mat-received-rows-wrapper">
+                  <div class="mat-row mat-row-received">
+                    <div class="mat-label"><span class="mat-row-date">02-07-2022</span> ZINC RAW MATERIAL RECEIVED</div>
+                    <div class="mat-val" id="view-mat-received">1256.000</div>
+                  </div>
                 </div>
                 <div class="mat-row mat-row-subtotal">
                   <div class="mat-label">TOTAL</div>

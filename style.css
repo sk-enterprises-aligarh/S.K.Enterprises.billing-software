@@ -704,12 +704,146 @@ body.theme-dark .form-control.bg-highlight {
   font-weight: 700;
   color: var(--text-main);
 }
-.signature-canvas-container {
+
+/* Zinc Raw Material Received Dynamic List */
+.mat-received-section {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  margin-top: 10px;
+  margin-bottom: 10px;
+}
+.mat-received-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.mat-received-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.mat-section-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+.badge-count {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(29, 78, 216, 0.12);
+  color: var(--primary);
+}
+.mat-received-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+}
+.mat-rec-card {
+  background: var(--bg-card, #ffffff);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+body.theme-dark .mat-rec-card {
+  background: #1e293b;
+  border-color: #334155;
+}
+.mat-rec-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.mat-rec-num {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--primary);
+  text-transform: uppercase;
+}
+.btn-del-mat-entry {
+  background: none;
+  border: none;
+  color: #ef4444;
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: background 0.15s ease;
+}
+.btn-del-mat-entry:hover {
+  background: rgba(239, 68, 68, 0.12);
+}
+.mat-received-total-strip {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 7px 10px;
+  background: var(--bg-hover, rgba(0, 0, 0, 0.04));
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-top: 8px;
   border: 1px dashed var(--border-color);
+}
+.mat-received-total-strip strong {
+  color: var(--text-main);
+  font-family: var(--font-mono, monospace);
+  font-size: 0.85rem;
+}
+
+/* Signature Modes & Canvas */
+.sig-mode-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 10px;
+  background: var(--bg-input, #f1f5f9);
+  padding: 3px;
+  border-radius: var(--radius-sm);
+}
+body.theme-dark .sig-mode-tabs {
+  background: #0f172a;
+}
+.btn-sig-mode {
+  flex: 1;
+  padding: 5px 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 600;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+.btn-sig-mode.active, .btn-sig-mode:hover {
+  background: var(--bg-surface, #ffffff);
+  color: var(--primary);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+body.theme-dark .btn-sig-mode.active {
+  background: #1e293b;
+  color: #60a5fa;
+}
+.signature-canvas-container {
+  border: 1.5px dashed var(--border-color);
   background: #ffffff;
   border-radius: var(--radius-sm);
   position: relative;
-  height: 120px;
+  height: 130px;
+  touch-action: none;
+  overflow: hidden;
 }
 body.theme-dark .signature-canvas-container {
   background: #ffffff; /* keep signature pad clean white */
@@ -719,6 +853,7 @@ body.theme-dark .signature-canvas-container {
   width: 100%;
   height: 100%;
   cursor: crosshair;
+  touch-action: none;
 }
 .signature-hint-watermark {
   position: absolute;
@@ -729,6 +864,7 @@ body.theme-dark .signature-canvas-container {
   font-size: 0.75rem;
   color: #94a3b8;
   font-style: italic;
+  text-align: center;
 }
 .sig-action-bar {
   display: flex;
@@ -741,15 +877,61 @@ body.theme-dark .signature-canvas-container {
   gap: 6px;
 }
 .pen-dot {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   cursor: pointer;
   border: 2px solid transparent;
+  transition: transform 0.15s ease;
 }
 .pen-dot.active {
   border-color: var(--primary);
-  transform: scale(1.15);
+  transform: scale(1.2);
+}
+.sig-status-badge {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-left: auto;
+  font-weight: 500;
+}
+.type-sign-preview-box {
+  background: #ffffff;
+  border: 1.5px dashed var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+  text-align: center;
+  margin-top: 6px;
+  overflow: hidden;
+}
+.typed-signature-display {
+  font-family: 'Caveat', 'Dancing Script', cursive, sans-serif;
+  font-size: 2.2rem;
+  font-weight: 700;
+  color: #1d4ed8;
+  text-shadow: 0 0 1px rgba(29, 78, 216, 0.2);
+  letter-spacing: 1px;
+}
+.upload-sign-dropzone {
+  border: 2px dashed var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 18px;
+  text-align: center;
+  cursor: pointer;
+  background: var(--bg-card);
+  transition: border-color 0.2s;
+}
+.upload-sign-dropzone:hover {
+  border-color: var(--primary);
+  background: rgba(29, 78, 216, 0.03);
+}
+.upload-dropzone-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.76rem;
+  color: var(--text-secondary);
+  cursor: pointer;
 }
 
 /* Editor Footer Quick Summary Bar */
@@ -1276,6 +1458,19 @@ body.theme-dark .signature-canvas-container {
 }
 .mat-label {
   font-weight: 600;
+}
+.mat-row-date {
+  font-weight: 700;
+  margin-right: 5px;
+}
+.mat-note-suffix {
+  font-weight: 600;
+  font-size: 0.88em;
+  opacity: 0.85;
+}
+.mat-row-received {
+  border-bottom: 0.5px dashed rgba(0, 0, 0, 0.15);
+  padding: 1px 0;
 }
 .mat-val {
   font-weight: 800;

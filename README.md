@@ -45,14 +45,25 @@ As per configuration, the billing entity is fixed and cannot be accidentally mod
 
 ### ⚖️ Details of Material (Zinc Job Work Material Ledger)
 Direct accounting of raw material issued by the customer and casting returned:
-- Date of Material Ledger (e.g. `02-07-2022`)
-- Opening Balance (Kg)
-- Zinc Raw Material Received (Kg)
-- Total Available (Opening + Received)
-- Casting Delivered (Kg) with 1-click "Sync Qty" from bill
-- Burning / Melting Loss (Kg) with 1-click "5% Loss" calculator
-- Zinc Returned (Kg)
-- Auto-calculated Zinc Balance with the caster
+- **Opening Balance**: Date (e.g. `02-07-2022`) and Opening weight (Kg).
+- **Dynamic Zinc Raw Material Received**:
+  - **"+ Add Received Entry" Button**: Add multiple raw zinc consignments across different dates or lot receipts.
+  - **Individual Date Field**: Each receipt entry has its own date picker (formatted on the printed bill as `DD-MM-YYYY ZINC RAW MATERIAL RECEIVED`).
+  - **Weight & Challan / Notes**: Specify quantity in Kg and optional challan or lot reference number.
+  - **Auto-Aggregated Total**: Sum of all received entries automatically updates Total Material Available and Balance.
+- **Casting Delivered (Kg)** with 1-click "Sync Qty" from bill.
+- **Burning / Melting Loss (Kg)** with 1-click "5% Loss" calculator.
+- **Zinc Returned (Kg)**.
+- **Auto-calculated Zinc Balance** with the job worker.
+
+### ✍️ Authorised Signatory & Official Rubber Stamp
+- **Multi-Mode Signature System**:
+  - **✏️ Draw Signature**: High-DPI HTML5 canvas supporting fluid mouse, touch, and stylus pen strokes with Navy Blue, Black, and Purple ink options.
+  - **⌨️ Type Name**: Type partner/signatory name to generate an authentic calligraphic handwritten cursive signature using Google Fonts (`Caveat` & `Dancing Script`).
+  - **📁 Upload File**: Upload existing signature image (PNG, JPG, SVG).
+  - **⚡ S.K. Preset**: 1-click official S K ENTERPRISES Partner signature.
+- **Instant Synchronization**: Every signature stroke or selection syncs in real-time right above "Partner/ Authorised Signatory" on the live invoice sheet.
+- **Official S K Enterprises Stamp**: Embedded vector rubber stamp with adjustable ink color and tilt angle.
 
 ### 🖨️ Pixel-Perfect Standard A4 Print & PDF
 - Exact replica of the original physical tax invoice with crisp black borders and high-contrast typography.

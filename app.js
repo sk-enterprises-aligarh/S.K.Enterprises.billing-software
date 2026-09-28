@@ -78,11 +78,78 @@ const ORIGINAL_BILL_DATA = {
   customRoundoff: -0.40,
   wordsOverride: '',
 
+// Official S K Enterprises Partner Signature Preset Vector Data URL
+const DEFAULT_PARTNER_SIGNATURE_DATAURL = (function() {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="110" viewBox="0 0 320 110">
+    <path d="M25 65 C 45 25, 75 20, 85 55 C 95 90, 115 25, 135 60 C 145 75, 160 35, 185 55 C 205 70, 230 45, 255 58 C 275 68, 290 55, 305 60" fill="none" stroke="#1d4ed8" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="35" y="68" font-family="'Caveat', cursive, sans-serif" font-size="44" font-weight="700" fill="#1d4ed8">S. K. Enterprises</text>
+    <path d="M30 84 Q 160 76, 285 80" fill="none" stroke="#1d4ed8" stroke-width="2.2" stroke-linecap="round"/>
+  </svg>`;
+  return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+})();
+
+// Active state clone
+const ORIGINAL_BILL_DATA = {
+  invoiceNumber: '001',
+  invoiceDate: '2022-05-15',
+  copyType: 'ORIGINAL',
+  category: 'JOB WORK',
+
+  // Buyer Details ("Billed To:")
+  buyer: {
+    name: 'M/s SREE CORPORATION',
+    addr1: 'C-72, PHASE-I',
+    addr2: 'TALANAGRI',
+    cityPin: 'ALIGARH - 202001',
+    gstin: '09AEZPG1543H1Z6',
+    state: 'UTTAR PRADESH',
+    stateCode: '09'
+  },
+
+  // Details of Consignment
+  consignment: {
+    transport: '',
+    lrNo: '',
+    vehNo: '',
+    ewbNo: '',
+    placeOfSupply: '',
+    noOfCases: '35 BAGS',
+    reverseCharge: '',
+    weight: 402.000,
+    freight: 0
+  },
+
+  // Line items (Particulars)
+  items: [
+    {
+      id: 'item-1',
+      particulars: 'ZINC DIE CASTING CHARGES',
+      hsn: '9988',
+      qty: 402.000,
+      rate: 40.00
+    }
+  ],
+
+  // Tax and Round off
+  taxMode: 'intra', // 'intra' (9% SGST + 9% CGST) or 'inter' (18% IGST)
+  autoDetectTax: true,
+  autoRoundoff: true,
+  customRoundoff: -0.40,
+  wordsOverride: '',
+
   // Details of Material (Zinc Job Work Ledger)
   material: {
     show: true,
     date: '2022-07-02',
     opening: 0.000,
+    receivedEntries: [
+      {
+        id: 'rec-1',
+        date: '2022-07-02',
+        qty: 1256.000,
+        note: ''
+      }
+    ],
     received: 1256.000,
     delivered: 402.000,
     loss: 20.100,
@@ -96,8 +163,8 @@ const ORIGINAL_BILL_DATA = {
     rotation: -7
   },
   signature: {
-    show: false,
-    dataUrl: '',
+    show: true,
+    dataUrl: DEFAULT_PARTNER_SIGNATURE_DATAURL,
     caption: 'Partner/ Authorised Signatory'
   }
 };
@@ -299,8 +366,18 @@ function calculateBillTotals() {
   }
 
   // 5. Material Ledger (Zinc Job Work Calculations)
+  ensureMaterialEntries(currentInvoice.material);
   const matOpening = parseFloat(currentInvoice.material.opening) || 0;
-  const matReceived = parseFloat(currentInvoice.material.received) || 0;
+  
+  // Calculate total received from receivedEntries array with legacy fallback
+  let matReceived = 0;
+  if (Array.isArray(currentInvoice.material.receivedEntries) && currentInvoice.material.receivedEntries.length > 0) {
+    matReceived = currentInvoice.material.receivedEntries.reduce((sum, entry) => sum + (parseFloat(entry.qty) || 0), 0);
+  } else {
+    matReceived = parseFloat(currentInvoice.material.received) || 0;
+  }
+  currentInvoice.material.received = matReceived;
+
   const matTotal = matOpening + matReceived;
   const matDelivered = parseFloat(currentInvoice.material.delivered) || 0;
   const matLoss = parseFloat(currentInvoice.material.loss) || 0;
@@ -467,7 +544,29 @@ function renderInvoiceSheet() {
     matContainer.style.display = '';
     document.getElementById('view-mat-date').textContent = formatDateDDMMYYYY(currentInvoice.material.date);
     document.getElementById('view-mat-opening').textContent = formatQty(totals.material.opening);
-    document.getElementById('view-mat-received').textContent = formatQty(totals.material.received);
+
+    // Render dynamic received rows on the printed bill
+    const rowsWrapper = document.getElementById('view-mat-received-rows-wrapper');
+    if (rowsWrapper) {
+      rowsWrapper.innerHTML = '';
+      const entries = (currentInvoice.material.receivedEntries && currentInvoice.material.receivedEntries.length > 0)
+        ? currentInvoice.material.receivedEntries
+        : [{ id: 'rec-fallback', date: currentInvoice.material.date, qty: totals.material.received, note: '' }];
+
+      entries.forEach(entry => {
+        const row = document.createElement('div');
+        row.className = 'mat-row mat-row-received';
+        const dateFormatted = entry.date ? formatDateDDMMYYYY(entry.date) : '';
+        const dateSpan = dateFormatted ? `<span class="mat-row-date">${dateFormatted}</span> ` : '';
+        const noteSpan = entry.note ? ` <span class="mat-note-suffix">(${entry.note})</span>` : '';
+        row.innerHTML = `
+          <div class="mat-label">${dateSpan}ZINC RAW MATERIAL RECEIVED${noteSpan}</div>
+          <div class="mat-val">${formatQty(entry.qty)}</div>
+        `;
+        rowsWrapper.appendChild(row);
+      });
+    }
+
     document.getElementById('view-mat-total').textContent = formatQty(totals.material.total);
     document.getElementById('view-mat-delivered').textContent = formatQty(totals.material.delivered);
     document.getElementById('view-mat-loss').textContent = formatQty(totals.material.loss);
@@ -477,6 +576,8 @@ function renderInvoiceSheet() {
     // Sidebar indicators
     document.getElementById('mat-total').value = totals.material.total.toFixed(3);
     document.getElementById('mat-balance').value = totals.material.balance.toFixed(3);
+    const stripVal = document.getElementById('mat-received-total-strip-val');
+    if (stripVal) stripVal.textContent = `${totals.material.received.toFixed(3)} Kg`;
     document.getElementById('metric-mat-total').textContent = `${totals.material.total.toFixed(3)} Kg`;
     document.getElementById('metric-mat-used').textContent = `${(totals.material.delivered + totals.material.loss).toFixed(3)} Kg`;
     document.getElementById('metric-mat-bal').textContent = `${totals.material.balance.toFixed(3)} Kg`;
@@ -553,7 +654,7 @@ function populateEditorFields() {
   document.getElementById('toggle-material-table').checked = currentInvoice.material.show;
   document.getElementById('mat-date').value = currentInvoice.material.date;
   document.getElementById('mat-opening').value = currentInvoice.material.opening;
-  document.getElementById('mat-received').value = currentInvoice.material.received;
+  renderMaterialReceivedEditor();
   document.getElementById('mat-delivered').value = currentInvoice.material.delivered;
   document.getElementById('mat-loss').value = currentInvoice.material.loss;
   document.getElementById('mat-returned').value = currentInvoice.material.returned;
@@ -1102,97 +1203,357 @@ async function exportAllInvoicesToZip() {
 // =============================================================================
 // 9. Signature Pad (HTML5 Canvas)
 // =============================================================================
+// Ensure material entries helper
+function ensureMaterialEntries(mat) {
+  if (!mat) return;
+  if (!Array.isArray(mat.receivedEntries) || mat.receivedEntries.length === 0) {
+    const qty = parseFloat(mat.received) || 0;
+    mat.receivedEntries = [
+      {
+        id: 'rec-' + Date.now(),
+        date: mat.date || '2022-07-02',
+        qty: qty,
+        note: ''
+      }
+    ];
+  }
+}
+
+// Render dynamic Zinc Raw Material Received Cards in Editor
+function renderMaterialReceivedEditor() {
+  ensureMaterialEntries(currentInvoice.material);
+  const container = document.getElementById('mat-received-entries-container');
+  if (!container) return;
+
+  container.innerHTML = '';
+  const entries = currentInvoice.material.receivedEntries;
+
+  const countBadge = document.getElementById('mat-rec-count-badge');
+  if (countBadge) {
+    countBadge.textContent = `${entries.length} ${entries.length === 1 ? 'Entry' : 'Entries'}`;
+  }
+
+  entries.forEach((entry, idx) => {
+    const card = document.createElement('div');
+    card.className = 'mat-rec-card';
+    card.dataset.id = entry.id;
+    card.innerHTML = `
+      <div class="mat-rec-header">
+        <span class="mat-rec-num">Entry #${idx + 1}</span>
+        ${entries.length > 1 ? `<button type="button" class="btn-del-mat-entry" data-id="${entry.id}" title="Remove this entry">✕ Remove</button>` : ''}
+      </div>
+      <div class="form-row">
+        <div class="form-group flex-1">
+          <label>Receipt Date *</label>
+          <input type="date" class="form-control mat-entry-date" value="${entry.date || ''}">
+        </div>
+        <div class="form-group flex-1">
+          <label>Received Qty (Kg.) *</label>
+          <input type="number" step="0.001" class="form-control mat-entry-qty font-bold" value="${entry.qty !== undefined ? entry.qty : ''}" placeholder="0.000">
+        </div>
+      </div>
+      <div class="form-group mt-1">
+        <label>Challan / Slip No. / Remarks (Optional)</label>
+        <input type="text" class="form-control mat-entry-note" value="${entry.note || ''}" placeholder="e.g. Challan #104 or Lot 1">
+      </div>
+    `;
+    container.appendChild(card);
+  });
+
+  // Attach input listeners
+  container.querySelectorAll('.mat-entry-date').forEach((input, idx) => {
+    input.addEventListener('change', (e) => {
+      currentInvoice.material.receivedEntries[idx].date = e.target.value;
+      renderInvoiceSheet();
+    });
+  });
+
+  container.querySelectorAll('.mat-entry-qty').forEach((input, idx) => {
+    input.addEventListener('input', (e) => {
+      currentInvoice.material.receivedEntries[idx].qty = parseFloat(e.target.value) || 0;
+      renderInvoiceSheet();
+    });
+  });
+
+  container.querySelectorAll('.mat-entry-note').forEach((input, idx) => {
+    input.addEventListener('input', (e) => {
+      currentInvoice.material.receivedEntries[idx].note = e.target.value;
+      renderInvoiceSheet();
+    });
+  });
+
+  container.querySelectorAll('.btn-del-mat-entry').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const id = e.target.dataset.id;
+      currentInvoice.material.receivedEntries = currentInvoice.material.receivedEntries.filter(item => item.id !== id);
+      renderMaterialReceivedEditor();
+      renderInvoiceSheet();
+      showToast('Received entry removed', 'toast-info');
+    });
+  });
+}
+
+// =============================================================================
+// 9. Signature Pad (HTML5 Canvas with Pointer Events & Multi-Mode)
+// =============================================================================
+let signatureCtx = null;
+let signatureCanvas = null;
+
 function initSignaturePad() {
   const canvas = document.getElementById('signature-pad');
   if (!canvas) return;
 
-  const ctx = canvas.getContext('2d');
-  let isDrawing = false;
-  let currentColor = '#1e293b';
+  signatureCanvas = canvas;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  signatureCtx = ctx;
 
-  function resizeCanvas() {
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width * 2;
-    canvas.height = rect.height * 2;
-    ctx.scale(2, 2);
-    ctx.lineWidth = 2.2;
+  let isDrawing = false;
+  let currentColor = '#1d4ed8'; // Navy Blue default ink
+  let currentLineWidth = 3.5;
+
+  // Fixed high-resolution canvas space
+  canvas.width = 600;
+  canvas.height = 200;
+
+  function updateContextStyle() {
+    ctx.lineWidth = currentLineWidth;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.strokeStyle = currentColor;
   }
-  resizeCanvas();
+  updateContextStyle();
 
-  function startDrawing(e) {
-    isDrawing = true;
+  function getCanvasPoint(e) {
     const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX || (e.touches && e.touches[0].clientX)) - rect.left;
-    const y = (e.clientY || (e.touches && e.touches[0].clientY)) - rect.top;
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    document.getElementById('signature-hint').style.display = 'none';
+    const scaleX = rect.width ? (canvas.width / rect.width) : 1;
+    const scaleY = rect.height ? (canvas.height / rect.height) : 1;
+    let clientX = e.clientX;
+    let clientY = e.clientY;
+    if (e.touches && e.touches.length > 0) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    }
+    return {
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY
+    };
   }
 
-  function draw(e) {
+  function startDraw(e) {
+    isDrawing = true;
+    updateContextStyle();
+    const pt = getCanvasPoint(e);
+    ctx.beginPath();
+    ctx.moveTo(pt.x, pt.y);
+    const hint = document.getElementById('signature-hint');
+    if (hint) hint.style.display = 'none';
+    const status = document.getElementById('sig-status-badge');
+    if (status) status.textContent = 'Drawing...';
+  }
+
+  function moveDraw(e) {
     if (!isDrawing) return;
-    const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX || (e.touches && e.touches[0].clientX)) - rect.left;
-    const y = (e.clientY || (e.touches && e.touches[0].clientY)) - rect.top;
-    ctx.lineTo(x, y);
+    const pt = getCanvasPoint(e);
+    ctx.lineTo(pt.x, pt.y);
     ctx.stroke();
   }
 
-  function stopDrawing() {
+  function endDraw() {
     if (!isDrawing) return;
     isDrawing = false;
-    currentInvoice.signature.dataUrl = canvas.toDataURL('image/png');
+    const dataUrl = canvas.toDataURL('image/png');
+    currentInvoice.signature.dataUrl = dataUrl;
     currentInvoice.signature.show = true;
-    document.getElementById('toggle-signature').checked = true;
+    const toggleSig = document.getElementById('toggle-signature');
+    if (toggleSig) toggleSig.checked = true;
+    const status = document.getElementById('sig-status-badge');
+    if (status) status.textContent = '✓ Signature synced to bill';
     renderInvoiceSheet();
   }
 
-  canvas.addEventListener('mousedown', startDrawing);
-  canvas.addEventListener('mousemove', draw);
-  window.addEventListener('mouseup', stopDrawing);
-
-  canvas.addEventListener('touchstart', (e) => { e.preventDefault(); startDrawing(e); }, { passive: false });
-  canvas.addEventListener('touchmove', (e) => { e.preventDefault(); draw(e); }, { passive: false });
-  window.addEventListener('touchend', stopDrawing);
+  // Pointer events (modern web standard for mouse, touch & stylus)
+  canvas.addEventListener('pointerdown', (e) => {
+    try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+    startDraw(e);
+  });
+  canvas.addEventListener('pointermove', moveDraw);
+  canvas.addEventListener('pointerup', (e) => {
+    try { canvas.releasePointerCapture(e.pointerId); } catch (err) {}
+    endDraw();
+  });
+  canvas.addEventListener('pointercancel', (e) => {
+    try { canvas.releasePointerCapture(e.pointerId); } catch (err) {}
+    endDraw();
+  });
 
   // Pen color picker
   document.querySelectorAll('.pen-dot').forEach(dot => {
     dot.addEventListener('click', (e) => {
       document.querySelectorAll('.pen-dot').forEach(d => d.classList.remove('active'));
       e.target.classList.add('active');
-      currentColor = e.target.dataset.color;
-      ctx.strokeStyle = currentColor;
+      currentColor = e.target.dataset.color || '#1d4ed8';
+      updateContextStyle();
     });
   });
 
   // Clear signature button
-  document.getElementById('btn-clear-sig').addEventListener('click', () => {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    currentInvoice.signature.dataUrl = '';
-    currentInvoice.signature.show = false;
-    document.getElementById('toggle-signature').checked = false;
-    document.getElementById('signature-hint').style.display = 'block';
-    renderInvoiceSheet();
-  });
+  const btnClear = document.getElementById('btn-clear-sig');
+  if (btnClear) {
+    btnClear.addEventListener('click', () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      currentInvoice.signature.dataUrl = '';
+      currentInvoice.signature.show = false;
+      const toggleSig = document.getElementById('toggle-signature');
+      if (toggleSig) toggleSig.checked = false;
+      const hint = document.getElementById('signature-hint');
+      if (hint) hint.style.display = 'block';
+      const status = document.getElementById('sig-status-badge');
+      if (status) status.textContent = 'Canvas cleared';
+      renderInvoiceSheet();
+    });
+  }
 
   // Signature file upload
-  document.getElementById('input-sig-file').addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        currentInvoice.signature.dataUrl = event.target.result;
-        currentInvoice.signature.show = true;
-        document.getElementById('toggle-signature').checked = true;
-        renderInvoiceSheet();
-        showToast('Signature image uploaded!', 'toast-success');
-      };
-      reader.readAsDataURL(file);
-    }
+  const fileInput = document.getElementById('input-sig-file');
+  if (fileInput) {
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const img = new Image();
+          img.onload = () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const scale = Math.min(canvas.width / img.width, canvas.height / img.height) * 0.85;
+            const nw = img.width * scale;
+            const nh = img.height * scale;
+            const nx = (canvas.width - nw) / 2;
+            const ny = (canvas.height - nh) / 2;
+            ctx.drawImage(img, nx, ny, nw, nh);
+            currentInvoice.signature.dataUrl = event.target.result;
+            currentInvoice.signature.show = true;
+            const toggleSig = document.getElementById('toggle-signature');
+            if (toggleSig) toggleSig.checked = true;
+            const hint = document.getElementById('signature-hint');
+            if (hint) hint.style.display = 'none';
+            const status = document.getElementById('sig-status-badge');
+            if (status) status.textContent = '✓ Image loaded';
+            renderInvoiceSheet();
+            showToast('Signature image uploaded and applied!', 'toast-success');
+          };
+          img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+  }
+
+  // Signature mode tabs (Draw / Type / Upload)
+  document.querySelectorAll('.btn-sig-mode').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const mode = e.currentTarget.dataset.sigMode;
+      if (!mode) return;
+      document.querySelectorAll('.btn-sig-mode').forEach(b => b.classList.remove('active'));
+      e.currentTarget.classList.add('active');
+
+      document.querySelectorAll('.sig-panel').forEach(p => p.style.display = 'none');
+      const targetPanel = document.getElementById(`sig-mode-${mode}-panel`);
+      if (targetPanel) targetPanel.style.display = 'block';
+
+      if (mode === 'draw') {
+        refreshSignatureCanvas();
+      }
+    });
   });
+
+  // Typed Signature Apply
+  const btnApplyType = document.getElementById('btn-apply-typed-sign');
+  const inputType = document.getElementById('input-type-sign');
+  const typePreview = document.getElementById('type-sign-preview-text');
+
+  if (inputType && typePreview) {
+    inputType.addEventListener('input', (e) => {
+      typePreview.textContent = e.target.value || 'S. K. Enterprises';
+    });
+  }
+
+  if (btnApplyType && inputType) {
+    btnApplyType.addEventListener('click', () => {
+      const name = (inputType.value || 'S. K. Enterprises').trim();
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.font = 'italic 700 52px "Caveat", "Dancing Script", cursive, sans-serif';
+      ctx.fillStyle = currentColor || '#1d4ed8';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(name, canvas.width / 2, canvas.height / 2 - 6);
+
+      // Add calligraphic underline flourish
+      ctx.beginPath();
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = currentColor || '#1d4ed8';
+      const textWidth = ctx.measureText(name).width;
+      const startX = Math.max(20, (canvas.width - textWidth) / 2 - 10);
+      const endX = Math.min(canvas.width - 20, (canvas.width + textWidth) / 2 + 25);
+      const startY = canvas.height / 2 + 26;
+      ctx.moveTo(startX, startY);
+      ctx.quadraticCurveTo(canvas.width / 2, startY + 12, endX, startY - 4);
+      ctx.stroke();
+
+      currentInvoice.signature.dataUrl = canvas.toDataURL('image/png');
+      currentInvoice.signature.show = true;
+      const toggleSig = document.getElementById('toggle-signature');
+      if (toggleSig) toggleSig.checked = true;
+      const hint = document.getElementById('signature-hint');
+      if (hint) hint.style.display = 'none';
+      const status = document.getElementById('sig-status-badge');
+      if (status) status.textContent = '✓ Typed signature applied';
+      renderInvoiceSheet();
+      showToast('Typed digital signature applied!', 'toast-success');
+    });
+  }
+
+  // S.K. Enterprises Preset Partner Signature button
+  const btnPreset = document.getElementById('btn-sig-preset');
+  if (btnPreset) {
+    btnPreset.addEventListener('click', () => {
+      currentInvoice.signature.dataUrl = DEFAULT_PARTNER_SIGNATURE_DATAURL;
+      currentInvoice.signature.show = true;
+      const toggleSig = document.getElementById('toggle-signature');
+      if (toggleSig) toggleSig.checked = true;
+      refreshSignatureCanvas();
+      renderInvoiceSheet();
+      showToast('Official S K Enterprises Partner signature loaded!', 'toast-success');
+    });
+  }
+
+  // Initial draw if preset is present
+  refreshSignatureCanvas();
+}
+
+function refreshSignatureCanvas() {
+  if (!signatureCanvas || !signatureCtx) return;
+  const hint = document.getElementById('signature-hint');
+  const status = document.getElementById('sig-status-badge');
+
+  if (currentInvoice.signature && currentInvoice.signature.dataUrl) {
+    const img = new Image();
+    img.onload = () => {
+      signatureCtx.clearRect(0, 0, signatureCanvas.width, signatureCanvas.height);
+      const scale = Math.min(signatureCanvas.width / img.width, signatureCanvas.height / img.height) * 0.9;
+      const nw = img.width * scale;
+      const nh = img.height * scale;
+      const nx = (signatureCanvas.width - nw) / 2;
+      const ny = (signatureCanvas.height - nh) / 2;
+      signatureCtx.drawImage(img, nx, ny, nw, nh);
+      if (hint) hint.style.display = 'none';
+      if (status) status.textContent = '✓ Active signature loaded';
+    };
+    img.src = currentInvoice.signature.dataUrl;
+  } else {
+    signatureCtx.clearRect(0, 0, signatureCanvas.width, signatureCanvas.height);
+    if (hint) hint.style.display = 'block';
+    if (status) status.textContent = 'Ready to draw';
+  }
 }
 
 // =============================================================================
@@ -1226,7 +1587,13 @@ function setupEventListeners() {
       document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
       const targetTab = e.currentTarget.dataset.tab;
       e.currentTarget.classList.add('active');
-      document.getElementById(targetTab).classList.add('active');
+      const targetEl = document.getElementById(targetTab);
+      if (targetEl) targetEl.classList.add('active');
+
+      // Refresh signature canvas if switching to signature tab
+      if (targetTab === 'tab-sign') {
+        refreshSignatureCanvas();
+      }
     });
   });
 
@@ -1428,10 +1795,24 @@ function setupEventListeners() {
     currentInvoice.material.opening = parseFloat(e.target.value) || 0;
     renderInvoiceSheet();
   });
-  document.getElementById('mat-received').addEventListener('input', (e) => {
-    currentInvoice.material.received = parseFloat(e.target.value) || 0;
-    renderInvoiceSheet();
-  });
+
+  // Add Zinc Raw Material Received Entry Button Listener
+  const btnAddMatRec = document.getElementById('btn-add-mat-received');
+  if (btnAddMatRec) {
+    btnAddMatRec.addEventListener('click', () => {
+      ensureMaterialEntries(currentInvoice.material);
+      const defaultDate = currentInvoice.invoiceDate || new Date().toISOString().split('T')[0];
+      currentInvoice.material.receivedEntries.push({
+        id: 'rec-' + Date.now(),
+        date: defaultDate,
+        qty: 0.000,
+        note: ''
+      });
+      renderMaterialReceivedEditor();
+      renderInvoiceSheet();
+      showToast('Added Zinc Raw Material Received entry', 'toast-success');
+    });
+  }
   document.getElementById('mat-delivered').addEventListener('input', (e) => {
     currentInvoice.material.delivered = parseFloat(e.target.value) || 0;
     renderInvoiceSheet();
